@@ -42,6 +42,8 @@ class NavigationManager {
 			error_log('[Files Archive] Icon path: ' . $iconPath);
 
 			// Simple navigation entry array (like Files/Activity apps)
+			// Note: INavigationManager might be for app navigation, not top bar
+			// But we'll try it anyway
 			$entry = [
 				'id' => Application::APP_ID,
 				'order' => 10,
@@ -49,16 +51,25 @@ class NavigationManager {
 				'icon' => $iconPath,
 				'name' => $l->t('Archive'),
 				'type' => 'link',
+				'app' => Application::APP_ID,
 			];
 			
 			error_log('[Files Archive] Navigation entry: ' . json_encode($entry, JSON_UNESCAPED_SLASHES));
+			error_log('[Files Archive] NavigationManager class: ' . get_class($this->navigationManager));
 			
-			// Register using closure (standard Nextcloud pattern)
-			// The closure is called when navigation is rendered
-			$this->navigationManager->add(function () use ($entry) {
-				error_log('[Files Archive] Navigation closure called, returning entry');
-				return $entry;
-			});
+			// Try registering directly first
+			try {
+				$this->navigationManager->add($entry);
+				error_log('[Files Archive] Navigation entry added directly (non-closure)');
+			} catch (\Exception $e) {
+				error_log('[Files Archive] Direct add failed, trying closure: ' . $e->getMessage());
+				// Register using closure (standard Nextcloud pattern)
+				// The closure is called when navigation is rendered
+				$this->navigationManager->add(function () use ($entry) {
+					error_log('[Files Archive] Navigation closure called, returning entry');
+					return $entry;
+				});
+			}
 			
 			error_log('[Files Archive] Navigation entry registered successfully');
 		} catch (\Exception $e) {
