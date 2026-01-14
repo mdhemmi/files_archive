@@ -1,0 +1,41 @@
+{
+	"autoload": {
+		"psr-4": {
+			"OCA\\Files_Archive\\": "lib/"
+		}
+	},
+	"name": "nextcloud/files_archive",
+	"description": "files_archive",
+	"license": "AGPL",
+	"config": {
+		"optimize-autoloader": true,
+		"classmap-authoritative": true,
+		"platform": {
+			"php": "8.2"
+		},
+		"sort-packages": true,
+		"allow-plugins": {
+			"bamarni/composer-bin-plugin": true
+		}
+	},
+	"scripts": {
+		"lint": "find . -name \\*.php -not -path './vendor/*' -not -path './vendor-bin/*' -not -path './build/*' -print0 | xargs -0 -n1 php -l",
+		"cs:check": "php-cs-fixer fix --dry-run --diff",
+		"cs:fix": "php-cs-fixer fix",
+		"openapi": "generate-spec",
+		"psalm": "psalm --no-cache --threads=$(nproc)",
+		"psalm:dev": "@psalm",
+		"psalm:update-baseline": "psalm --threads=1 --update-baseline",
+		"test:unit": "vendor/bin/phpunit --colors=always -c tests/phpunit.xml --fail-on-warning --fail-on-risky --display-deprecations --display-phpunit-deprecations",
+		"post-install-cmd": [
+			"[ $COMPOSER_DEV_MODE -eq 0 ] || composer bin all install"
+		],
+		"post-update-cmd": [
+			"[ $COMPOSER_DEV_MODE -eq 0 ] || composer bin all install"
+		]
+	},
+	"require-dev": {
+		"bamarni/composer-bin-plugin": "^1.8",
+		"nextcloud/ocp": "dev-master"
+	}
+}
