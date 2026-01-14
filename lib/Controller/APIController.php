@@ -20,6 +20,11 @@ use OCP\IRequest;
 use OCP\SystemTag\ISystemTagManager;
 use OCP\SystemTag\TagNotFoundException;
 use Psr\Log\LoggerInterface;
+use OCP\AppFramework\Utility\ITimeFactory;
+use OCP\Files\Config\IUserMountCache;
+use OCP\Files\IRootFolder;
+use OCP\IUserManager;
+use OCP\SystemTag\ISystemTagObjectMapper;
 
 /**
  * @psalm-import-type Files_ArchiveRule from ResponseDefinitions
@@ -32,6 +37,11 @@ class APIController extends OCSController {
 		private readonly ISystemTagManager $tagManager,
 		private readonly IJobList $jobList,
 		private readonly LoggerInterface $logger,
+		private readonly ITimeFactory $timeFactory,
+		private readonly ISystemTagObjectMapper $tagMapper,
+		private readonly IUserMountCache $userMountCache,
+		private readonly IRootFolder $rootFolder,
+		private readonly IUserManager $userManager,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -205,5 +215,79 @@ class APIController extends OCSController {
 		$this->jobList->remove(ArchiveJob::class, $jobKey);
 
 		return new DataResponse([], Http::STATUS_NO_CONTENT);
+	}
+
+	/**
+	 * Manually trigger archive job for all active rules
+	 *
+	 * @return DataResponse<Http::STATUS_OK, array{message: string, rulesProcessed: int}, array{}>
+	 *
+	 * 200: Archive job triggered
+	 */
+	public function runArchiveJob(): DataResponse {
+		// Get all active archive rules
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from('archive_rules')
+			->orderBy('id');
+
+		$cursor = $qb->executeQuery();
+		$rules = [];
+		while ($data = $cursor->fetch()) {
+			$tagIdValue = $data['tag_id'];
+			$tagId = ($tagIdValue !== null && $tagIdValue !== '' && $tagIdValue !== '0') ? (int)$tagIdValue : null;
+			$ruleId = (int)$data['id'];
+			
+			$rules[] = [
+				'id' => $ruleId,
+				'tag_id' => $tagId,
+				'time_unit' => (int)$data['time_unit'],
+				'time_amount' => (int)$data['time_amount'],
+				'time_after' => (int)$data['time_after'],
+			];
+		}
+		$cursor->closeCursor();
+
+		if (empty($rules)) {
+			return new DataResponse([
+				'message' => 'No archive rules configured',
+				'rulesProcessed' => 0,
+			], Http::STATUS_OK);
+		}
+
+		// Create and run archive job for each rule
+		$rulesProcessed = 0;
+		foreach ($rules as $rule) {
+			try {
+				$jobKey = $rule['tag_id'] !== null ? ['tag' => $rule['tag_id']] : ['rule' => $rule['id']];
+				
+				// Create a new ArchiveJob instance and run it immediately
+				$job = new ArchiveJob(
+					$this->timeFactory,
+					$this->tagManager,
+					$this->tagMapper,
+					$this->userMountCache,
+					$this->db,
+					$this->rootFolder,
+					$this->jobList,
+					$this->userManager,
+					$this->logger
+				);
+				
+				$job->run($jobKey);
+				$rulesProcessed++;
+				
+				$this->logger->info('Manually triggered archive job for rule ' . $rule['id']);
+			} catch (\Exception $e) {
+				$this->logger->error('Failed to run archive job for rule ' . $rule['id'] . ': ' . $e->getMessage(), [
+					'exception' => $e,
+				]);
+			}
+		}
+
+		return new DataResponse([
+			'message' => 'Archive job completed',
+			'rulesProcessed' => $rulesProcessed,
+		], Http::STATUS_OK);
 	}
 }

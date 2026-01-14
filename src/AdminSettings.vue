@@ -7,6 +7,23 @@
 		:doc-url="docUrl"
 		:description="t('files_archive', 'Automatically archive files based on age. Archived files are moved to the .archive folder, which is hidden from mobile apps but accessible via the web interface.')">
 		
+		<!-- Manual Archive Button -->
+		<div class="archive-actions">
+			<NcButton variant="secondary"
+				type="button"
+				:disabled="loading || runningArchive"
+				:aria-label="t('files_archive', 'Run archive job now')"
+				@click="onClickRunArchive">
+				<template #icon>
+					<Play :size="20" />
+				</template>
+				{{ runningArchive ? t('files_archive', 'Running...') : t('files_archive', 'Run archive now') }}
+			</NcButton>
+			<p class="archive-actions__hint">
+				{{ t('files_archive', 'Manually trigger the archive job to process files immediately instead of waiting for the scheduled run.') }}
+			</p>
+		</div>
+
 		<!-- Existing Rules -->
 		<div v-if="archiveRules.length > 0" class="archive-rules-list">
 			<h3 class="archive-section-title">
@@ -105,8 +122,10 @@ import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import Archive from 'vue-material-design-icons/Archive.vue'
+import Play from 'vue-material-design-icons/Play.vue'
 
 import ArchiveRule from './Components/ArchiveRule.vue'
+import { runArchiveJob } from './services/archiveService.js'
 
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import { loadState } from '@nextcloud/initial-state'
@@ -123,6 +142,7 @@ export default {
 		NcTextField,
 		Plus,
 		Archive,
+		Play,
 	},
 
 	data() {
@@ -140,6 +160,7 @@ export default {
 
 		return {
 			loading: true,
+			runningArchive: false,
 			docUrl: loadState('files_archive', 'doc-url'),
 
 			unitOptions,
@@ -219,11 +240,49 @@ export default {
 			this.newUnit = this.unitOptions[3] // Default to years
 			this.newAfter = this.afterOptions[1] // Default to modification date
 		},
+
+		async onClickRunArchive() {
+			if (this.runningArchive) {
+				return
+			}
+
+			this.runningArchive = true
+			try {
+				const response = await runArchiveJob()
+				const rulesProcessed = response.data?.ocs?.data?.rulesProcessed || 0
+				
+				if (rulesProcessed > 0) {
+					showSuccess(t('files_archive', 'Archive job completed. Processed {count} rule(s).', { count: rulesProcessed }))
+				} else {
+					showSuccess(t('files_archive', 'Archive job completed. No rules to process.'))
+				}
+			} catch (e) {
+				showError(t('files_archive', 'Failed to run archive job'))
+				console.error(e)
+			} finally {
+				this.runningArchive = false
+			}
+		},
 	},
 }
 </script>
 
 <style scoped lang="scss">
+.archive-actions {
+	margin-bottom: 32px;
+	padding: 16px;
+	background: var(--color-main-background);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+}
+
+.archive-actions__hint {
+	font-size: 0.9em;
+	color: var(--color-text-maxcontrast);
+	margin: 8px 0 0 0;
+	line-height: 1.4;
+}
+
 .archive-section-title {
 	font-size: 1.2em;
 	font-weight: 600;

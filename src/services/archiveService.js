@@ -29,8 +29,17 @@ const getArchiveRules = async function() {
 	return axios.get(generateOcsUrl('/apps/files_archive/api/v1/rules'))
 }
 
+/**
+ * Manually trigger archive job for all active rules
+ * @return {object} The axios response
+ */
+const runArchiveJob = async function() {
+	return axios.post(generateOcsUrl('/apps/files_archive/api/v1/run'))
+}
+
 export {
 	createArchiveRule,
 	deleteArchiveRule,
 	getArchiveRules,
+	runArchiveJob,
 }
