@@ -5,4 +5,5 @@
 
 import { getLogger } from '@nextcloud/logger'
 
-export default getLogger('files_archive')
+// getLogger() without arguments - app name is detected automatically
+export default getLogger()
