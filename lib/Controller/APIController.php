@@ -257,9 +257,7 @@ class APIController extends OCSController {
 
 		// Create and run archive job for each rule
 		$rulesProcessed = 0;
-		$totalFilesArchived = 0;
-		$totalFilesChecked = 0;
-		$totalUsersProcessed = 0;
+		$errors = [];
 		
 		foreach ($rules as $rule) {
 			try {
@@ -268,7 +266,8 @@ class APIController extends OCSController {
 				// Calculate archive before date for logging
 				$archiveBefore = $this->calculateArchiveBeforeDate($rule['time_unit'], $rule['time_amount']);
 				
-				$this->logger->info('Manually triggered archive job for rule ' . $rule['id'] . ' (archive files older than ' . $archiveBefore->format('Y-m-d') . ')');
+				$this->logger->info('Manually triggered archive job for rule ' . $rule['id'] . ' (archive files older than ' . $archiveBefore->format('Y-m-d H:i:s') . ')');
+				error_log('Files Archive: Starting archive job for rule ' . $rule['id'] . ' - archive files older than ' . $archiveBefore->format('Y-m-d H:i:s'));
 				
 				// Create a new ArchiveJob instance and run it immediately
 				$job = new ArchiveJob(
@@ -286,13 +285,16 @@ class APIController extends OCSController {
 				$job->run($jobKey);
 				$rulesProcessed++;
 				
-				// Note: For detailed stats, we'd need to modify ArchiveJob to return stats
-				// For now, we'll just log that it completed
 				$this->logger->info('Archive job completed for rule ' . $rule['id']);
+				error_log('Files Archive: Archive job completed for rule ' . $rule['id']);
 			} catch (\Exception $e) {
-				$this->logger->error('Failed to run archive job for rule ' . $rule['id'] . ': ' . $e->getMessage(), [
+				$errorMsg = 'Failed to run archive job for rule ' . $rule['id'] . ': ' . $e->getMessage();
+				$errors[] = $errorMsg;
+				$this->logger->error($errorMsg, [
 					'exception' => $e,
 				]);
+				error_log('Files Archive ERROR: ' . $errorMsg);
+				error_log('Files Archive ERROR Stack: ' . $e->getTraceAsString());
 			}
 		}
 

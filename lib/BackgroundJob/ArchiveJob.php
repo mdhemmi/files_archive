@@ -100,12 +100,15 @@ class ArchiveJob extends TimedJob {
 		if ($tagId !== null) {
 			// Tag-based archiving
 			$this->logger->info("Running archive for Tag $tagId with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
+			error_log("Files Archive: Running archive for Tag $tagId with archive before " . $archiveBefore->format('Y-m-d H:i:s'));
 			$this->archiveByTag($tagId, $archiveBefore, $timeAfter);
 		} else {
 			// Time-based archiving - archive all files for all users
 			$this->logger->info("Running time-based archive (Rule $ruleId) with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
+			error_log("Files Archive: Running time-based archive (Rule $ruleId) with archive before " . $archiveBefore->format('Y-m-d H:i:s'));
 			$stats = $this->archiveByTime($archiveBefore, $timeAfter);
 			$this->logger->info("Archive job completed: " . json_encode($stats));
+			error_log("Files Archive: Archive job completed - " . json_encode($stats));
 		}
 	}
 
@@ -153,9 +156,12 @@ class ArchiveJob extends TimedJob {
 			'filesChecked' => 0,
 		];
 		
+		error_log("Files Archive: Starting to process all users. Archive threshold: " . $archiveBefore->format('Y-m-d H:i:s'));
+		
 		$this->userManager->callForAllUsers(function ($user) use ($archiveBefore, $timeAfter, &$stats) {
 			$userId = $user->getUID();
 			try {
+				error_log("Files Archive: Processing user: $userId");
 				$userFolder = $this->rootFolder->getUserFolder($userId);
 				if (!Filesystem::$loaded) {
 					Filesystem::init($userId, '/' . $userId . '/files');
@@ -165,12 +171,20 @@ class ArchiveJob extends TimedJob {
 				$stats['usersProcessed']++;
 				$stats['filesArchived'] += $userStats['filesArchived'];
 				$stats['filesChecked'] += $userStats['filesChecked'];
+				
+				if ($userStats['filesChecked'] > 0) {
+					error_log("Files Archive: User $userId - Checked: {$userStats['filesChecked']}, Archived: {$userStats['filesArchived']}");
+				}
 			} catch (Exception $e) {
-				$this->logger->warning("Failed to archive files for user $userId: " . $e->getMessage(), [
+				$errorMsg = "Failed to archive files for user $userId: " . $e->getMessage();
+				error_log("Files Archive ERROR: $errorMsg");
+				$this->logger->warning($errorMsg, [
 					'exception' => $e,
 				]);
 			}
 		});
+		
+		error_log("Files Archive: Completed processing. Total users: {$stats['usersProcessed']}, Files checked: {$stats['filesChecked']}, Files archived: {$stats['filesArchived']}");
 		
 		return $stats;
 	}
