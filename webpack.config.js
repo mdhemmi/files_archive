@@ -2,10 +2,12 @@ const webpackConfig = require('@nextcloud/webpack-vue-config')
 const path = require('path')
 
 // Add entry points
+// Note: @nextcloud/webpack-vue-config automatically prefixes with app name
+// So 'main' becomes 'files_archive-main.js'
 webpackConfig.entry = {
-	'files_archive-main': './src/main.js',
-	'files_archive-navigation': './src/filesNavigation.js',
-	'files_archive-archive': './src/archive.js',
+	'main': './src/main.js',
+	'navigation': './src/filesNavigation.js',
+	'archive': './src/archive.js',
 }
 
 // Ensure output directory is explicitly set to js/

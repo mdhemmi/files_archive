@@ -44,9 +44,28 @@ else
     ls -lh js/ | tail -n +2
     echo ""
     echo "   Verifying required files exist:"
-    [ -f "js/files_archive-main.js" ] && echo "   ✓ files_archive-main.js exists" || echo "   ✗ files_archive-main.js MISSING"
-    [ -f "js/files_archive-navigation.js" ] && echo "   ✓ files_archive-navigation.js exists" || echo "   ✗ files_archive-navigation.js MISSING"
-    [ -f "js/files_archive-archive.js" ] && echo "   ✓ files_archive-archive.js exists" || echo "   ✗ files_archive-archive.js MISSING"
+    # Check for files with correct naming (after webpack prefix)
+    if [ -f "js/files_archive-main.js" ]; then
+        echo "   ✓ files_archive-main.js exists"
+    elif [ -f "js/files_archive-files_archive-main.js" ]; then
+        echo "   ⚠ files_archive-files_archive-main.js exists (wrong name - will be fixed on next build)"
+    else
+        echo "   ✗ files_archive-main.js MISSING"
+    fi
+    if [ -f "js/files_archive-navigation.js" ]; then
+        echo "   ✓ files_archive-navigation.js exists"
+    elif [ -f "js/files_archive-files_archive-navigation.js" ]; then
+        echo "   ⚠ files_archive-files_archive-navigation.js exists (wrong name - will be fixed on next build)"
+    else
+        echo "   ✗ files_archive-navigation.js MISSING"
+    fi
+    if [ -f "js/files_archive-archive.js" ]; then
+        echo "   ✓ files_archive-archive.js exists"
+    elif [ -f "js/files_archive-files_archive-archive.js" ]; then
+        echo "   ⚠ files_archive-files_archive-archive.js exists (wrong name - will be fixed on next build)"
+    else
+        echo "   ✗ files_archive-archive.js MISSING"
+    fi
 fi
 
 echo ""
