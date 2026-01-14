@@ -1,0 +1,15 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="archiveGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0082C9;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0066A3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Folder base -->
+  <path d="M 8 12 L 8 52 L 56 52 L 56 20 L 32 20 L 28 12 Z" fill="url(#archiveGradient)" stroke="#004D73" stroke-width="1.5"/>
+  <!-- Archive box lines -->
+  <rect x="20" y="28" width="24" height="16" fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.8"/>
+  <line x1="26" y1="28" x2="26" y2="44" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.8"/>
+  <line x1="32" y1="28" x2="32" y2="44" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.8"/>
+  <line x1="38" y1="28" x2="38" y2="44" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.8"/>
+</svg>
