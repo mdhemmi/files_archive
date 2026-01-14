@@ -33,10 +33,20 @@ echo ""
 echo "4. Verifying build output..."
 if [ ! -d "js" ] || [ -z "$(ls -A js/ 2>/dev/null)" ]; then
     echo "   ERROR: No JavaScript files were generated!"
+    echo "   Current directory: $(pwd)"
+    echo "   Checking for js directory..."
+    ls -la | grep js || echo "   No js directory found"
+    echo "   Checking webpack output..."
+    find . -name "*.js" -path "*/js/*" 2>/dev/null | head -5 || echo "   No JS files found in js/ directory"
     exit 1
 else
     echo "   ✓ JavaScript files found:"
     ls -lh js/ | tail -n +2
+    echo ""
+    echo "   Verifying required files exist:"
+    [ -f "js/files_archive-main.js" ] && echo "   ✓ files_archive-main.js exists" || echo "   ✗ files_archive-main.js MISSING"
+    [ -f "js/files_archive-navigation.js" ] && echo "   ✓ files_archive-navigation.js exists" || echo "   ✗ files_archive-navigation.js MISSING"
+    [ -f "js/files_archive-archive.js" ] && echo "   ✓ files_archive-archive.js exists" || echo "   ✗ files_archive-archive.js MISSING"
 fi
 
 echo ""
