@@ -37,9 +37,18 @@ const runArchiveJob = async function() {
 	return axios.post(generateOcsUrl('/apps/files_archive/api/v1/run'))
 }
 
+/**
+ * Get list of archived files for the current user
+ * @return {object} The axios response
+ */
+const getArchivedFiles = async function() {
+	return axios.get(generateOcsUrl('/apps/files_archive/api/v1/files'))
+}
+
 export {
 	createArchiveRule,
 	deleteArchiveRule,
 	getArchiveRules,
 	runArchiveJob,
+	getArchivedFiles,
 }

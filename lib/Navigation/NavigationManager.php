@@ -24,54 +24,40 @@ class NavigationManager {
 		$l = $this->l10nFactory->get(Application::APP_ID);
 
 		// Register navigation entry in top navigation bar
+		// Following the same pattern as Files and Activity apps
 		try {
-			// Generate URL to Files app with .archive directory
-			// Use direct linkTo instead of linkToRoute for more reliability
-			$archiveUrl = $this->urlGenerator->linkTo('', 'index.php/apps/files') . '?dir=/.archive';
+			// Generate URL to our own archive view
+			$archiveUrl = $this->urlGenerator->linkToRoute('files_archive.Page.index');
 
-			// Get icon path (relative is fine, Nextcloud will make it absolute)
+			// Get icon path (relative - Nextcloud will make it absolute)
 			$iconPath = $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg');
 
-			error_log('[Files Archive] Attempting to register navigation...');
+			error_log('[Files Archive] Registering navigation entry...');
 			error_log('[Files Archive] Archive URL: ' . $archiveUrl);
 			error_log('[Files Archive] Icon path: ' . $iconPath);
-			error_log('[Files Archive] NavigationManager type: ' . get_class($this->navigationManager));
 
-			// Create navigation entry array
+			// Simple navigation entry array (like Files/Activity apps)
 			$entry = [
 				'id' => Application::APP_ID,
 				'order' => 10,
 				'href' => $archiveUrl,
 				'icon' => $iconPath,
 				'name' => $l->t('Archive'),
-				'app' => Application::APP_ID,
 			];
 			
-			error_log('[Files Archive] Navigation entry array: ' . json_encode($entry));
+			error_log('[Files Archive] Navigation entry: ' . json_encode($entry));
 			
-			// Try both closure and direct array registration
-			// First try closure (preferred method)
+			// Register using closure (standard Nextcloud pattern)
 			$this->navigationManager->add(function () use ($entry) {
-				error_log('[Files Archive] Navigation entry closure called');
 				return $entry;
 			});
 			
-			// Also try direct array (some Nextcloud versions prefer this)
-			try {
-				$this->navigationManager->add($entry);
-				error_log('[Files Archive] Also registered navigation entry directly');
-			} catch (\Exception $e) {
-				// Ignore if direct registration fails, closure should work
-				error_log('[Files Archive] Direct registration failed (expected): ' . $e->getMessage());
-			}
-			
-			error_log('[Files Archive] Navigation entry registered successfully via add()');
+			error_log('[Files Archive] Navigation entry registered successfully');
 		} catch (\Exception $e) {
 			error_log('[Files Archive] Failed to register navigation: ' . $e->getMessage());
 			error_log('[Files Archive] Stack trace: ' . $e->getTraceAsString());
 		} catch (\Throwable $e) {
-			error_log('[Files Archive] Fatal error registering navigation: ' . $e->getMessage());
-			error_log('[Files Archive] Stack trace: ' . $e->getTraceAsString());
+			error_log('[Files Archive] Fatal error: ' . $e->getMessage());
 		}
 	}
 }

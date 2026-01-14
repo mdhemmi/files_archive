@@ -340,4 +340,75 @@ class APIController extends OCSController {
 
 		return $currentDate->sub($delta);
 	}
+
+	/**
+	 * Get list of archived files for the current user
+	 * 
+	 * @NoAdminRequired
+	 */
+	public function getArchivedFiles(): DataResponse {
+		$userId = $this->userId;
+		
+		if (!$userId) {
+			return new DataResponse(['error' => 'User not authenticated'], Http::STATUS_UNAUTHORIZED);
+		}
+
+		try {
+			$userFolder = $this->rootFolder->getUserFolder($userId);
+			
+			// Get .archive folder
+			try {
+				$archiveFolder = $userFolder->get(Constants::ARCHIVE_FOLDER);
+				if (!$archiveFolder instanceof \OCP\Files\Folder) {
+					return new DataResponse(['files' => [], 'message' => 'Archive folder is not a folder']);
+				}
+			} catch (\OCP\Files\NotFoundException $e) {
+				return new DataResponse(['files' => [], 'message' => 'Archive folder does not exist yet']);
+			}
+
+			// Get all files recursively
+			$files = $this->getFilesRecursive($archiveFolder, $archiveFolder->getPath());
+			
+			return new DataResponse([
+				'files' => $files,
+				'count' => count($files),
+			], Http::STATUS_OK);
+		} catch (\Exception $e) {
+			$this->logger->error('Error getting archived files: ' . $e->getMessage(), [
+				'exception' => $e,
+			]);
+			return new DataResponse(['error' => 'Failed to get archived files'], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	/**
+	 * Recursively get all files from a folder
+	 */
+	private function getFilesRecursive(\OCP\Files\Folder $folder, string $basePath): array {
+		$files = [];
+		$nodes = $folder->getDirectoryListing();
+
+		foreach ($nodes as $node) {
+			$relativePath = str_replace($basePath . '/', '', $node->getPath());
+			
+			if ($node instanceof \OCP\Files\Folder) {
+				// Recursively get files from subfolders
+				$subFiles = $this->getFilesRecursive($node, $basePath);
+				$files = array_merge($files, $subFiles);
+			} else {
+				// Add file info
+				$files[] = [
+					'id' => $node->getId(),
+					'name' => $node->getName(),
+					'path' => $relativePath,
+					'size' => $node->getSize(),
+					'mtime' => $node->getMTime(),
+					'mimetype' => $node->getMimeType(),
+					'etag' => $node->getEtag(),
+				];
+			}
+		}
+
+		return $files;
+	}
 }
