@@ -9,6 +9,7 @@ namespace OCA\Files_Archive\AppInfo;
 
 use OCA\Files_Archive\BackgroundJob\ArchiveJob;
 use OCA\Files_Archive\EventListener;
+use OCA\Files_Archive\Navigation\NavigationManager;
 use OCA\Files_Archive\Notification\Notifier;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
@@ -32,7 +33,13 @@ class Application extends App implements IBootstrap {
 
 	#[\Override]
 	public function boot(IBootContext $context): void {
-		// Load Files navigation script globally (it will check if Files app is loaded)
+		$container = $context->getAppContainer();
+		
+		// Register top navigation entry
+		$navigationManager = $container->get(NavigationManager::class);
+		$navigationManager->register();
+		
+		// Also try Files app sidebar navigation (fallback)
 		Util::addScript(self::APP_ID, 'files_archive-navigation');
 	}
 }
