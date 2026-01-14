@@ -249,16 +249,19 @@ export default {
 			this.runningArchive = true
 			try {
 				const response = await runArchiveJob()
-				const rulesProcessed = response.data?.ocs?.data?.rulesProcessed || 0
+				const data = response.data?.ocs?.data || response.data || {}
+				const rulesProcessed = data.rulesProcessed || 0
+				const message = data.message || t('files_archive', 'Archive job completed')
+				const hint = data.hint || ''
 				
 				if (rulesProcessed > 0) {
-					showSuccess(t('files_archive', 'Archive job completed. Processed {count} rule(s).', { count: rulesProcessed }))
+					showSuccess(message + (hint ? ' ' + hint : ''))
 				} else {
-					showSuccess(t('files_archive', 'Archive job completed. No rules to process.'))
+					showSuccess(message + (hint ? ' ' + hint : ''))
 				}
 			} catch (e) {
-				showError(t('files_archive', 'Failed to run archive job'))
-				console.error(e)
+				showError(t('files_archive', 'Failed to run archive job: {error}', { error: e.message || 'Unknown error' }))
+				console.error('Archive job error:', e)
 			} finally {
 				this.runningArchive = false
 			}

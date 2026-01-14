@@ -257,9 +257,18 @@ class APIController extends OCSController {
 
 		// Create and run archive job for each rule
 		$rulesProcessed = 0;
+		$totalFilesArchived = 0;
+		$totalFilesChecked = 0;
+		$totalUsersProcessed = 0;
+		
 		foreach ($rules as $rule) {
 			try {
 				$jobKey = $rule['tag_id'] !== null ? ['tag' => $rule['tag_id']] : ['rule' => $rule['id']];
+				
+				// Calculate archive before date for logging
+				$archiveBefore = $this->calculateArchiveBeforeDate($rule['time_unit'], $rule['time_amount']);
+				
+				$this->logger->info('Manually triggered archive job for rule ' . $rule['id'] . ' (archive files older than ' . $archiveBefore->format('Y-m-d') . ')');
 				
 				// Create a new ArchiveJob instance and run it immediately
 				$job = new ArchiveJob(
@@ -277,7 +286,9 @@ class APIController extends OCSController {
 				$job->run($jobKey);
 				$rulesProcessed++;
 				
-				$this->logger->info('Manually triggered archive job for rule ' . $rule['id']);
+				// Note: For detailed stats, we'd need to modify ArchiveJob to return stats
+				// For now, we'll just log that it completed
+				$this->logger->info('Archive job completed for rule ' . $rule['id']);
 			} catch (\Exception $e) {
 				$this->logger->error('Failed to run archive job for rule ' . $rule['id'] . ': ' . $e->getMessage(), [
 					'exception' => $e,
@@ -285,9 +296,43 @@ class APIController extends OCSController {
 			}
 		}
 
+		$message = 'Archive job completed';
+		if ($rulesProcessed === 0) {
+			$message = 'No rules were processed';
+		} elseif ($rulesProcessed === 1) {
+			$message = 'Archive job completed for 1 rule. Check logs for details about archived files.';
+		} else {
+			$message = "Archive job completed for $rulesProcessed rules. Check logs for details about archived files.";
+		}
+
 		return new DataResponse([
-			'message' => 'Archive job completed',
+			'message' => $message,
 			'rulesProcessed' => $rulesProcessed,
+			'hint' => 'If no files were archived, they may not meet the age criteria. Check Nextcloud logs for details.',
 		], Http::STATUS_OK);
+	}
+
+	/**
+	 * Calculate archive before date (helper for logging)
+	 */
+	private function calculateArchiveBeforeDate(int $timeUnit, int $timeAmount): \DateTime {
+		$spec = 'P' . $timeAmount;
+
+		if ($timeUnit === Constants::UNIT_DAY) {
+			$spec .= 'D';
+		} elseif ($timeUnit === Constants::UNIT_WEEK) {
+			$spec .= 'W';
+		} elseif ($timeUnit === Constants::UNIT_MONTH) {
+			$spec .= 'M';
+		} elseif ($timeUnit === Constants::UNIT_YEAR) {
+			$spec .= 'Y';
+		}
+
+		$delta = new \DateInterval($spec);
+		$currentDate = new \DateTime();
+		$currentDate->setTimestamp($this->timeFactory->getTime());
+
+		return $currentDate->sub($delta);
+	}
 	}
 }

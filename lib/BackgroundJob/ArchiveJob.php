@@ -99,12 +99,13 @@ class ArchiveJob extends TimedJob {
 
 		if ($tagId !== null) {
 			// Tag-based archiving
-			$this->logger->debug("Running archive for Tag $tagId with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
+			$this->logger->info("Running archive for Tag $tagId with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
 			$this->archiveByTag($tagId, $archiveBefore, $timeAfter);
 		} else {
 			// Time-based archiving - archive all files for all users
-			$this->logger->debug("Running time-based archive (Rule $ruleId) with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
-			$this->archiveByTime($archiveBefore, $timeAfter);
+			$this->logger->info("Running time-based archive (Rule $ruleId) with archive before " . $archiveBefore->format(\DateTimeInterface::ATOM));
+			$stats = $this->archiveByTime($archiveBefore, $timeAfter);
+			$this->logger->info("Archive job completed: " . json_encode($stats));
 		}
 	}
 
@@ -142,9 +143,17 @@ class ArchiveJob extends TimedJob {
 
 	/**
 	 * Archive files based on time for all users
+	 * 
+	 * @return array{usersProcessed: int, filesArchived: int, filesChecked: int}
 	 */
-	private function archiveByTime(\DateTime $archiveBefore, int $timeAfter): void {
-		$this->userManager->callForAllUsers(function ($user) use ($archiveBefore, $timeAfter) {
+	private function archiveByTime(\DateTime $archiveBefore, int $timeAfter): array {
+		$stats = [
+			'usersProcessed' => 0,
+			'filesArchived' => 0,
+			'filesChecked' => 0,
+		];
+		
+		$this->userManager->callForAllUsers(function ($user) use ($archiveBefore, $timeAfter, &$stats) {
 			$userId = $user->getUID();
 			try {
 				$userFolder = $this->rootFolder->getUserFolder($userId);
@@ -152,22 +161,34 @@ class ArchiveJob extends TimedJob {
 					Filesystem::init($userId, '/' . $userId . '/files');
 				}
 				
-				$this->archiveUserFolder($userFolder, $archiveBefore, $timeAfter, $userId);
+				$userStats = $this->archiveUserFolder($userFolder, $archiveBefore, $timeAfter, $userId);
+				$stats['usersProcessed']++;
+				$stats['filesArchived'] += $userStats['filesArchived'];
+				$stats['filesChecked'] += $userStats['filesChecked'];
 			} catch (Exception $e) {
 				$this->logger->warning("Failed to archive files for user $userId: " . $e->getMessage(), [
 					'exception' => $e,
 				]);
 			}
 		});
+		
+		return $stats;
 	}
 
 	/**
 	 * Recursively archive files in a folder
+	 * 
+	 * @return array{filesArchived: int, filesChecked: int}
 	 */
-	private function archiveUserFolder(Folder $folder, \DateTime $archiveBefore, int $timeAfter, string $userId): void {
+	private function archiveUserFolder(Folder $folder, \DateTime $archiveBefore, int $timeAfter, string $userId): array {
+		$stats = [
+			'filesArchived' => 0,
+			'filesChecked' => 0,
+		];
+		
 		// Skip the archive folder itself
 		if ($folder->getName() === Constants::ARCHIVE_FOLDER) {
-			return;
+			return $stats;
 		}
 
 		$nodes = $folder->getDirectoryListing();
@@ -179,12 +200,20 @@ class ArchiveJob extends TimedJob {
 
 			if ($node instanceof Folder) {
 				// Recursively process subfolders
-				$this->archiveUserFolder($node, $archiveBefore, $timeAfter, $userId);
+				$subStats = $this->archiveUserFolder($node, $archiveBefore, $timeAfter, $userId);
+				$stats['filesArchived'] += $subStats['filesArchived'];
+				$stats['filesChecked'] += $subStats['filesChecked'];
 			} else {
 				// Check and archive file
-				$this->archiveNode($node, $archiveBefore, $timeAfter, null);
+				$stats['filesChecked']++;
+				$archived = $this->archiveNode($node, $archiveBefore, $timeAfter, null);
+				if ($archived) {
+					$stats['filesArchived']++;
+				}
 			}
 		}
+		
+		return $stats;
 	}
 
 	/**
@@ -254,24 +283,32 @@ class ArchiveJob extends TimedJob {
 		return $time;
 	}
 
-	private function archiveNode(Node $node, \DateTime $archiveBefore, int $timeAfter, ?string $tagId): void {
+	/**
+	 * Archive a node if it matches the criteria
+	 * 
+	 * @return bool True if file was archived, false otherwise
+	 */
+	private function archiveNode(Node $node, \DateTime $archiveBefore, int $timeAfter, ?string $tagId): bool {
 		$time = $this->getDateFromNode($node, $timeAfter);
 
 		if ($time < $archiveBefore) {
-			$this->logger->debug('Archiving file ' . $node->getId());
+			$this->logger->debug('Archiving file ' . $node->getId() . ' (age: ' . $time->format('Y-m-d') . ', threshold: ' . $archiveBefore->format('Y-m-d') . ')');
 			try {
 				$this->moveToArchive($node);
 				// Remove tag after archiving to prevent re-archiving (only for tag-based rules)
 				if ($tagId !== null) {
 					$this->removeTagFromFile($node->getId(), $tagId);
 				}
+				return true;
 			} catch (Exception $e) {
 				$this->logger->error('Failed to archive file ' . $node->getId() . ': ' . $e->getMessage(), [
 					'exception' => $e,
 				]);
+				return false;
 			}
 		} else {
-			$this->logger->debug('Skipping file ' . $node->getId() . ' from archiving');
+			$this->logger->debug('Skipping file ' . $node->getId() . ' from archiving (age: ' . $time->format('Y-m-d') . ', threshold: ' . $archiveBefore->format('Y-m-d') . ')');
+			return false;
 		}
 	}
 
