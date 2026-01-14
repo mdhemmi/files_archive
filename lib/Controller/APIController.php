@@ -48,6 +48,7 @@ class APIController extends OCSController {
 
 	/**
 	 * List archive rules
+	 * Admin only - normal users cannot view or modify archive rules
 	 *
 	 * @return DataResponse<Http::STATUS_OK, list<Files_ArchiveRule>, array{}>
 	 *
@@ -122,6 +123,7 @@ class APIController extends OCSController {
 
 	/**
 	 * Create an archive rule
+	 * Admin only - normal users cannot create archive rules
 	 *
 	 * @param int|null $tagid Tag the archive rule is based on (null for time-based archiving)
 	 * @param 0|1|2|3|4|5 $timeunit Time unit (days=0, weeks=1, months=2, years=3, minutes=4, hours=5)
@@ -180,6 +182,7 @@ class APIController extends OCSController {
 
 	/**
 	 * Delete an archive rule
+	 * Admin only - normal users cannot delete archive rules
 	 *
 	 * @param int $id Archive rule to delete
 	 * @return DataResponse<Http::STATUS_NO_CONTENT|Http::STATUS_NOT_FOUND, list<empty>, array{}>
@@ -219,6 +222,7 @@ class APIController extends OCSController {
 
 	/**
 	 * Manually trigger archive job for all active rules
+	 * Admin only - normal users cannot trigger archive jobs
 	 *
 	 * @return DataResponse<Http::STATUS_OK, array{message: string, rulesProcessed: int}, array{}>
 	 *

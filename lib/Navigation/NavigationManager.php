@@ -27,7 +27,12 @@ class NavigationManager {
 		// Following the same pattern as Files and Activity apps
 		try {
 			// Generate URL to our own archive view
-			$archiveUrl = $this->urlGenerator->linkToRoute('files_archive.Page.index');
+			// Try using linkToRoute first, fallback to linkTo
+			try {
+				$archiveUrl = $this->urlGenerator->linkToRoute('files_archive.Page.index');
+			} catch (\Exception $e) {
+				$archiveUrl = $this->urlGenerator->linkTo('files_archive', 'index.php');
+			}
 
 			// Get icon path (relative - Nextcloud will make it absolute)
 			$iconPath = $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg');
@@ -43,12 +48,15 @@ class NavigationManager {
 				'href' => $archiveUrl,
 				'icon' => $iconPath,
 				'name' => $l->t('Archive'),
+				'type' => 'link',
 			];
 			
-			error_log('[Files Archive] Navigation entry: ' . json_encode($entry));
+			error_log('[Files Archive] Navigation entry: ' . json_encode($entry, JSON_UNESCAPED_SLASHES));
 			
 			// Register using closure (standard Nextcloud pattern)
+			// The closure is called when navigation is rendered
 			$this->navigationManager->add(function () use ($entry) {
+				error_log('[Files Archive] Navigation closure called, returning entry');
 				return $entry;
 			});
 			

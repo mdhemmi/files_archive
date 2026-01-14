@@ -56,12 +56,27 @@ php occ upgrade
 
 ## Usage
 
+### For Administrators
+
 1. Go to **Settings → Administration → Workflow → File Archive**
 2. Create an archive rule:
    - Set the archive period (e.g., 1 year)
-   - Choose time unit (Days/Weeks/Months/Years)
+   - Choose time unit (Minutes/Hours/Days/Weeks/Months/Years)
    - Select date calculation method (Creation date or Last modification date)
 3. Files matching the age criteria will be automatically archived to `.archive` folder for each user
+4. You can manually trigger archive jobs using the "Run archive now" button
+
+**Note**: Archive rule configuration is restricted to administrators only. Regular users cannot create, modify, or delete archive rules.
+
+### For Regular Users
+
+Regular users can:
+- View their archived files via the Archive view (accessible from the top navigation bar)
+- Access archived files through the Files app (enable "Show hidden files" in settings)
+
+Regular users cannot:
+- Create, modify, or delete archive rules
+- Manually trigger archive jobs
 
 ## How It Works
 
