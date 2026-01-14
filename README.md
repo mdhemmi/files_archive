@@ -10,7 +10,7 @@ An app for Nextcloud to automatically archive files based on file age. Archived 
 
 - **Automatic Archiving**: Archive files based on age (no tags required)
 - **Mobile App Hidden**: Archive folder is prefixed with a dot (`.archive`), making it invisible to mobile apps and preventing re-upload
-- **Web Accessible**: Archived files remain accessible through the web interface
+- **Web Accessible**: Archived files remain accessible through the web interface (enable "Show hidden files" in Files app settings)
 - **Time-Based Rules**: Create archive rules based on file age
 - **Flexible Time Periods**: Configure archive periods in days, weeks, months, or years
 - **Date Calculation**: Choose to calculate from creation date or last modification date
@@ -70,6 +70,14 @@ php occ upgrade
 - Background jobs run daily to check and archive files for all users
 - Archived files remain accessible via the web interface
 - Each user has their own `.archive` folder, ensuring files are organized per user
+
+## Viewing Archived Files
+
+The `.archive` folder is hidden from mobile apps but accessible via the web interface:
+
+- **Easy Access**: An **"Archive"** link is available in the Files app sidebar navigation for quick access
+- **Direct URL**: You can also access it directly via: `https://your-nextcloud.com/index.php/apps/files/?dir=/.archive`
+- **Show Hidden Files**: Alternatively, enable "Show hidden files" in Files app settings to see it in the folder tree
 
 ## Development
 

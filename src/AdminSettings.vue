@@ -7,6 +7,14 @@
 		:doc-url="docUrl"
 		:description="t('files_archive', 'Automatically archive files based on age. Archived files are moved to the .archive folder, which is hidden from mobile apps but accessible via the web interface.')">
 		
+		<!-- Info about viewing archived files -->
+		<div class="archive-info">
+			<div class="archive-info__card">
+				<strong>{{ t('files_archive', 'Accessing archived files') }}</strong>
+				<p>{{ t('files_archive', 'The .archive folder is hidden from mobile apps but accessible via the web interface. An "Archive" link is available in the Files app sidebar navigation for easy access.') }}</p>
+			</div>
+		</div>
+
 		<!-- Manual Archive Button -->
 		<div class="archive-actions">
 			<NcButton variant="secondary"
@@ -93,7 +101,7 @@
 				<div class="archive-form__info-box">
 					<Archive :size="20" class="archive-form__info-icon" />
 					<p class="archive-form__info-text">
-						{{ t('files_archive', 'All files matching the age criteria will be moved to the .archive folder for each user. This folder is automatically hidden from mobile apps to prevent re-uploading. You can access archived files through the web interface at any time.') }}
+						{{ t('files_archive', 'All files matching the age criteria will be moved to the .archive folder for each user. This folder is hidden from mobile apps to prevent re-uploading. You can access archived files through the web interface by enabling "Show hidden files" in Files app settings.') }}
 					</p>
 				</div>
 
@@ -401,5 +409,30 @@ export default {
 	display: flex;
 	justify-content: flex-end;
 	margin-top: 8px;
+}
+
+.archive-info {
+	margin-bottom: 24px;
+}
+
+.archive-info__card {
+	background: var(--color-primary-element-light);
+	border: 1px solid var(--color-primary-element);
+	border-radius: var(--border-radius);
+	padding: 16px;
+	
+	strong {
+		display: block;
+		margin-bottom: 8px;
+		color: var(--color-primary-element-text-dark);
+		font-size: 0.95em;
+	}
+	
+	p {
+		margin: 0;
+		font-size: 0.9em;
+		color: var(--color-main-text);
+		line-height: 1.5;
+	}
 }
 </style>
