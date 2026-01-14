@@ -24,20 +24,31 @@ class NavigationManager {
 		$l = $this->l10nFactory->get(Application::APP_ID);
 
 		// Register navigation entry in top navigation bar
-		$this->navigationManager->add(function () use ($l) {
+		try {
 			// Generate URL to Files app with .archive directory
-			$archiveUrl = $this->urlGenerator->getAbsoluteURL(
-				$this->urlGenerator->linkTo('', 'index.php/apps/files') . '?dir=/.archive'
-			);
+			$archiveUrl = $this->urlGenerator->linkToRoute('files.view.index') . '?dir=/.archive';
 
-			return [
-				'id' => Application::APP_ID,
-				'order' => 10,
-				'href' => $archiveUrl,
-				'icon' => $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg'),
-				'name' => $l->t('Archive'),
-				'app' => Application::APP_ID,
-			];
-		});
+			// Get icon path (relative is fine, Nextcloud will make it absolute)
+			$iconPath = $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg');
+
+			// Register using closure (allows lazy evaluation)
+			$this->navigationManager->add(function () use ($l, $archiveUrl, $iconPath) {
+				return [
+					'id' => Application::APP_ID,
+					'order' => 10,
+					'href' => $archiveUrl,
+					'icon' => $iconPath,
+					'name' => $l->t('Archive'),
+					'app' => Application::APP_ID,
+				];
+			});
+			
+			error_log('[Files Archive] Navigation entry registered successfully');
+			error_log('[Files Archive] Archive URL: ' . $archiveUrl);
+			error_log('[Files Archive] Icon path: ' . $iconPath);
+		} catch (\Exception $e) {
+			error_log('[Files Archive] Failed to register navigation: ' . $e->getMessage());
+			error_log('[Files Archive] Stack trace: ' . $e->getTraceAsString());
+		}
 	}
 }

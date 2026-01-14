@@ -35,9 +35,14 @@ class Application extends App implements IBootstrap {
 	public function boot(IBootContext $context): void {
 		$container = $context->getAppContainer();
 		
-		// Register top navigation entry
-		$navigationManager = $container->get(NavigationManager::class);
-		$navigationManager->register();
+		try {
+			// Register top navigation entry
+			$navigationManager = $container->get(NavigationManager::class);
+			$navigationManager->register();
+			error_log('[Files Archive] NavigationManager registered in boot()');
+		} catch (\Exception $e) {
+			error_log('[Files Archive] Error registering navigation in boot(): ' . $e->getMessage());
+		}
 		
 		// Also try Files app sidebar navigation (fallback)
 		Util::addScript(self::APP_ID, 'files_archive-navigation');
