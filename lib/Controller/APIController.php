@@ -24,6 +24,7 @@ use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Files\Config\IUserMountCache;
 use OCP\Files\IRootFolder;
 use OCP\IUserManager;
+use OCP\IUserSession;
 use OCP\SystemTag\ISystemTagObjectMapper;
 
 /**
@@ -42,6 +43,7 @@ class APIController extends OCSController {
 		private readonly IUserMountCache $userMountCache,
 		private readonly IRootFolder $rootFolder,
 		private readonly IUserManager $userManager,
+		private readonly IUserSession $userSession,
 	) {
 		parent::__construct($appName, $request);
 	}
@@ -351,11 +353,13 @@ class APIController extends OCSController {
 	 * @NoAdminRequired
 	 */
 	public function getArchivedFiles(): DataResponse {
-		$userId = $this->userId;
+		$user = $this->userSession->getUser();
 		
-		if (!$userId) {
+		if (!$user) {
 			return new DataResponse(['error' => 'User not authenticated'], Http::STATUS_UNAUTHORIZED);
 		}
+		
+		$userId = $user->getUID();
 
 		try {
 			$userFolder = $this->rootFolder->getUserFolder($userId);
