@@ -10,6 +10,7 @@ namespace OCA\Files_Archive\AppInfo;
 use OCA\Files_Archive\EventListener;
 use OCA\Files_Archive\Navigation\NavigationManager;
 use OCA\Files_Archive\Notification\Notifier;
+use OCA\Files_Archive\Repair\FavoriteArchiveFolders;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -28,6 +29,7 @@ class Application extends App implements IBootstrap {
 	public function register(IRegistrationContext $context): void {
 		$context->registerEventListener(ManagerEvent::EVENT_DELETE, EventListener::class);
 		$context->registerNotifierService(Notifier::class);
+		$context->registerRepairStep(FavoriteArchiveFolders::class);
 	}
 
 	#[\Override]

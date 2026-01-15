@@ -90,9 +90,12 @@ Regular users cannot:
 
 The `.archive` folder is hidden from mobile apps but accessible via the web interface:
 
-- **Easy Access**: An **"Archive"** link is available in the Files app sidebar navigation for quick access
+- **Favorites**: The `.archive` folder is **automatically added to Favorites** when created, making it easily accessible in the Files app sidebar
+- **Dedicated View**: Access archived files via the **Archive** app entry in the top navigation bar
 - **Direct URL**: You can also access it directly via: `https://your-nextcloud.com/index.php/apps/files/?dir=/.archive`
 - **Show Hidden Files**: Alternatively, enable "Show hidden files" in Files app settings to see it in the folder tree
+
+**Note**: For existing `.archive` folders created before this feature, run `php occ maintenance:repair` to add them to favorites automatically.
 
 ## Development
 
