@@ -7,7 +7,6 @@ declare(strict_types=1);
  */
 namespace OCA\Files_Archive\AppInfo;
 
-use OCA\Files_Archive\BackgroundJob\ArchiveJob;
 use OCA\Files_Archive\EventListener;
 use OCA\Files_Archive\Navigation\NavigationManager;
 use OCA\Files_Archive\Notification\Notifier;
@@ -48,3 +47,4 @@ class Application extends App implements IBootstrap {
 		Util::addScript(self::APP_ID, 'files_archive-navigation');
 	}
 }
+

@@ -30,6 +30,8 @@
 		<nextcloud min-version="28" max-version="33" />
 	</dependencies>
 
+	<bootstrap>OCA\Files_Archive\AppInfo\Application</bootstrap>
+
 	<settings>
 		<admin>OCA\Files_Archive\Settings\Admin</admin>
 	</settings>
