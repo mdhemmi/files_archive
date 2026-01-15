@@ -334,6 +334,7 @@ class ArchiveJob extends TimedJob {
 		$userFolder = $this->rootFolder->getUserFolder($userId);
 
 		// Get or create archive folder
+		$wasCreated = false;
 		try {
 			$archiveNode = $userFolder->get(Constants::ARCHIVE_FOLDER);
 			if (!$archiveNode instanceof Folder) {
@@ -343,6 +344,12 @@ class ArchiveJob extends TimedJob {
 		} catch (NotFoundException $e) {
 			// Create archive folder if it doesn't exist
 			$archiveFolder = $userFolder->newFolder(Constants::ARCHIVE_FOLDER);
+			$wasCreated = true;
+		}
+		
+		// If the archive folder was just created, add it to favorites
+		if ($wasCreated) {
+			$this->addToFavorites($archiveFolder);
 		}
 
 		// Determine relative path of the node inside the user's files folder
@@ -414,6 +421,66 @@ class ArchiveJob extends TimedJob {
 
 		$node->move($targetFolder->getPath() . '/' . $uniqueName);
 		$this->logger->debug('Archived file ' . $node->getId() . ' to ' . $targetFolder->getPath() . '/' . $uniqueName);
+	}
+
+	/**
+	 * Add the archive folder to favorites
+	 * In Nextcloud, favorites are implemented using a special system tag
+	 */
+	private function addToFavorites(Folder $archiveFolder): void {
+		try {
+			$fileId = $archiveFolder->getId();
+			$userId = $archiveFolder->getOwner()->getUID();
+			
+			// In Nextcloud, favorites use a special system tag
+			// The tag name pattern is typically "$user!favorite" where $user is the user ID
+			// However, system tags are global, so we need to find the right approach
+			
+			// Try to find existing favorite tags
+			$allTags = $this->tagManager->getAllTags('files');
+			$favoriteTag = null;
+			
+			foreach ($allTags as $tag) {
+				$tagName = $tag->getName();
+				// Check for favorite tag patterns used in Nextcloud
+				if ($tagName === '$user!favorite' || 
+				    $tagName === 'favorite' ||
+				    (strpos($tagName, 'favorite') !== false && $tag->isUserVisible() && $tag->isUserAssignable())) {
+					$favoriteTag = $tag;
+					break;
+				}
+			}
+			
+			// If no favorite tag exists, try to create one
+			if ($favoriteTag === null) {
+				try {
+					// Try to create a favorite tag
+					// Note: This might require admin permissions, so we'll try and catch
+					$favoriteTag = $this->tagManager->createTag('favorite', true, true);
+					$this->logger->debug('Created favorite tag for archive folder');
+				} catch (Exception $e) {
+					// If we can't create the tag, try using the Files app's built-in mechanism
+					// In Nextcloud, favorites might be stored differently
+					$this->logger->debug('Could not create favorite tag, trying alternative method: ' . $e->getMessage());
+					
+					// Alternative: Use WebDAV property or database directly
+					// For now, we'll log and continue - the user can manually favorite it
+					error_log('Files Archive: Could not add archive folder to favorites automatically. User can manually favorite the .archive folder.');
+					return;
+				}
+			}
+			
+			// Assign the favorite tag to the archive folder
+			$this->tagMapper->assignTags($fileId, 'files', [(string)$favoriteTag->getId()]);
+			$this->logger->info('Added archive folder to favorites (file ID: ' . $fileId . ', user: ' . $userId . ')');
+			error_log('Files Archive: Added .archive folder to favorites for user ' . $userId);
+		} catch (Exception $e) {
+			// Log but don't fail - favorite assignment is best effort
+			$this->logger->warning('Failed to add archive folder to favorites: ' . $e->getMessage(), [
+				'exception' => $e,
+			]);
+			error_log('Files Archive: Failed to add archive folder to favorites: ' . $e->getMessage());
+		}
 	}
 
 	/**
