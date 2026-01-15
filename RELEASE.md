@@ -2,6 +2,31 @@
 
 This document describes the step-by-step process for releasing the `files_archive` app to the Nextcloud App Store.
 
+## Quick Start: Automated Release
+
+If you're using GitHub, you can automate most of the release process:
+
+1. **Create a version tag**:
+   ```bash
+   git tag -a v1.0.0 -m "Release version 1.0.0"
+   git push origin v1.0.0
+   ```
+
+2. **GitHub Actions will automatically**:
+   - Build the app
+   - Create a release archive
+   - Create a GitHub release
+   - Upload the archive as a release asset
+
+3. **Sign and upload to App Store** (manual step):
+   - Download the archive from GitHub release
+   - Sign it using `occ app:sign` (see "Manual Release Process" below)
+   - Upload to https://apps.nextcloud.com
+
+See the [Automated Release](#automated-release) section below for more details.
+
+## Manual Release Process
+
 ## Prerequisites
 
 1. **Nextcloud App Store Account**: Create an account at https://apps.nextcloud.com
@@ -260,8 +285,74 @@ Example progression:
 - `1.0.1` → `1.1.0` (new feature)
 - `1.1.0` → `2.0.0` (breaking change)
 
+## Automated Release
+
+### GitHub Actions Workflow
+
+This repository includes GitHub Actions workflows that automate the release process:
+
+1. **`.github/workflows/release.yml`**: 
+   - Automatically runs when you push a version tag (e.g., `v1.0.0`)
+   - Builds the app (composer + npm)
+   - Creates a release archive
+   - Creates a GitHub release with the archive attached
+   - Optionally signs the app if certificates are configured
+
+2. **`.github/workflows/sign-and-release.yml`**:
+   - Manual workflow for signing and preparing App Store release
+   - Can be triggered from GitHub Actions UI
+
+### Setting Up Automated Releases
+
+1. **Add Signing Secrets (Optional)**:
+   - Go to your GitHub repository → Settings → Secrets and variables → Actions
+   - Add the following secrets:
+     - `APP_SIGNING_CERTIFICATE`: Contents of `files_archive.crt`
+     - `APP_SIGNING_KEY`: Contents of `files_archive.key`
+   - **Note**: Only add these if you trust GitHub with your signing keys. For maximum security, keep signing manual.
+
+2. **Create a Release**:
+   ```bash
+   # Update version in appinfo/info.xml first
+   git add appinfo/info.xml
+   git commit -m "Bump version to 1.0.0"
+   git tag -a v1.0.0 -m "Release version 1.0.0"
+   git push origin main
+   git push origin v1.0.0
+   ```
+
+3. **GitHub Actions will**:
+   - Automatically detect the tag
+   - Build the app
+   - Create a GitHub release
+   - Upload the archive
+
+4. **Sign and Upload** (if not automated):
+   - Download the archive from the GitHub release
+   - Sign it manually (see "Step 5: Sign the App" above)
+   - Upload to App Store
+
+### Workflow Triggers
+
+- **Automatic**: Push a tag matching `v*.*.*` (e.g., `v1.0.0`)
+- **Manual**: Go to Actions → Release → Run workflow → Enter version
+
+### Limitations
+
+- **Signing**: Fully automated signing requires a Nextcloud server environment. The workflow can create unsigned archives that you sign manually, or you can set up a self-hosted runner with Nextcloud installed.
+- **App Store Upload**: Currently requires manual upload to apps.nextcloud.com (no API available)
+
+### Alternative: Self-Hosted Runner
+
+For fully automated signing, you can set up a self-hosted GitHub Actions runner on a machine with Nextcloud installed:
+
+1. Set up a self-hosted runner on your Nextcloud server
+2. Modify the workflow to use `runs-on: self-hosted`
+3. The signing step will then have access to `occ app:sign`
+
 ## Additional Resources
 
 - [Nextcloud App Store Documentation](https://docs.nextcloud.com/server/latest/developer_manual/app_development/app_store.html)
 - [App Signing Guide](https://docs.nextcloud.com/server/latest/developer_manual/app_development/app_signing.html)
 - [App Store Guidelines](https://apps.nextcloud.com/developer/apps/guidelines)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
