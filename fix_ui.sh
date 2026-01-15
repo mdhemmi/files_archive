@@ -95,14 +95,32 @@ echo "   ✓ Permissions set"
 
 echo ""
 echo "7. Copying files to Docker container (if using Docker)..."
+# Try to find the Nextcloud container
+CONTAINER_NAME=""
 if docker ps | grep -q nextcloud_nextcloud_app; then
-    echo "   Copying js/ directory to Docker container..."
-    docker cp js/ nextcloud_nextcloud_app:/var/www/html/apps/time_archive/ 2>/dev/null && echo "   ✓ Files copied to Docker container" || echo "   (Warning: Could not copy to Docker - files may need manual copy)"
-    
-    echo "   Setting permissions in Docker container..."
-    docker exec -u root nextcloud_nextcloud_app chown -R www-data:www-data /var/www/html/apps/time_archive/js/ 2>/dev/null || echo "   (Warning: Could not set permissions in Docker)"
+    CONTAINER_NAME="nextcloud_nextcloud_app"
+elif docker ps --format "{{.Names}}" | grep -q nextcloud; then
+    CONTAINER_NAME=$(docker ps --format "{{.Names}}" | grep nextcloud | head -1)
+    echo "   Found Nextcloud container: $CONTAINER_NAME"
+fi
+
+if [ -n "$CONTAINER_NAME" ]; then
+    echo "   Copying js/ directory to Docker container ($CONTAINER_NAME)..."
+    if docker cp js/ ${CONTAINER_NAME}:/var/www/html/apps/time_archive/ 2>/dev/null; then
+        echo "   ✓ Files copied to Docker container"
+        
+        echo "   Setting permissions in Docker container..."
+        docker exec -u root ${CONTAINER_NAME} chown -R www-data:www-data /var/www/html/apps/time_archive/js/ 2>/dev/null || echo "   (Warning: Could not set permissions in Docker)"
+        
+        echo "   Verifying files in Docker..."
+        docker exec ${CONTAINER_NAME} ls -la /var/www/html/apps/time_archive/js/time_archive-main.js 2>/dev/null && echo "   ✓ main.js found in Docker" || echo "   ✗ main.js NOT found in Docker"
+    else
+        echo "   ✗ ERROR: Could not copy to Docker container"
+        echo "   You may need to manually copy the js/ directory to the container"
+    fi
 else
     echo "   (Docker container not found - skipping Docker copy)"
+    echo "   If using Docker, ensure the container is running and accessible"
 fi
 
 echo ""

@@ -47,9 +47,25 @@ class Application extends App implements IBootstrap {
 		// Load Files app sidebar navigation script
 		// This script will register the Archive entry in the Files app sidebar
 		// Note: Util::addScript automatically prefixes with app ID, so we just pass the base name
-		// The scripts themselves check if they're on the Files app page before running
-		Util::addScript(self::APP_ID, 'navigation');
-		// Note: archiveLink is optional - uncomment if needed after verifying file exists
+		// DISABLED: Commented out to avoid "Could not find resource" errors
+		// The navigation script is optional - it only adds a sidebar entry in Files app
+		// Users can still access archived files via the Archive app view or by navigating to .archive folder
+		// 
+		// To enable: Uncomment below and ensure js/time_archive-navigation.js exists on the server
+		// $requestUri = $_SERVER['REQUEST_URI'] ?? $_SERVER['SCRIPT_NAME'] ?? '';
+		// $isFilesPage = strpos($requestUri, '/apps/files') !== false || 
+		//                strpos($requestUri, '/index.php/apps/files') !== false ||
+		//                (isset($_GET['app']) && $_GET['app'] === 'files');
+		// 
+		// if ($isFilesPage) {
+		// 	try {
+		// 		Util::addScript(self::APP_ID, 'navigation');
+		// 	} catch (\Exception $e) {
+		// 		error_log('[Time Archive] Could not load navigation script: ' . $e->getMessage());
+		// 	}
+		// }
+		// 
+		// Note: archiveLink is also optional - uncomment if needed after verifying file exists
 		// Util::addScript(self::APP_ID, 'archiveLink');
 	}
 }
