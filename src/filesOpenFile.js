@@ -39,41 +39,61 @@ function autoOpenFile() {
 	// If fileid is in URL, Nextcloud might handle it automatically
 	// But we'll still try to help it along
 	
-	// Try to find file in DOM - inspect actual DOM structure first
+	// Try to find file in DOM - only look for actual file rows in Files app
 	const tryFindInDOM = () => {
 		if (!fileInfo.id) return null
 		
-		// First, let's see what's actually in the DOM
-		const allRows = document.querySelectorAll('tbody tr, .files-fileList tr, table tr, .file-row, [data-fileid], [data-id]')
-		console.log('[Time Archive] Found', allRows.length, 'potential file rows in DOM')
+		// Only look for actual file rows in the Files app, not notifications or other elements
+		// Files app uses specific classes and structures
+		const fileRows = document.querySelectorAll(
+			'.files-fileList tbody tr, ' +
+			'.files-fileList tr[data-file], ' +
+			'table.files-fileList tbody tr, ' +
+			'[data-fileid], ' +
+			'[data-file-id], ' +
+			'.file-row[data-id], ' +
+			'.file-row[data-fileid]'
+		)
+		console.log('[Time Archive] Found', fileRows.length, 'file rows in Files app')
 		
-		// Log first few rows to see their structure
-		if (allRows.length > 0) {
-			console.log('[Time Archive] Sample row structure:', allRows[0])
-			console.log('[Time Archive] Sample row attributes:', Array.from(allRows[0].attributes).map(a => `${a.name}="${a.value}"`))
-			if (allRows[0].dataset) {
-				console.log('[Time Archive] Sample row dataset:', allRows[0].dataset)
+		// Log first file row structure if found
+		if (fileRows.length > 0) {
+			const firstFileRow = Array.from(fileRows).find(row => {
+				// Make sure it's actually a file row, not a notification
+				const hasFileAttr = row.hasAttribute('data-file') || 
+				                   row.hasAttribute('data-fileid') || 
+				                   row.hasAttribute('data-file-id') ||
+				                   row.classList.contains('file-row')
+				return hasFileAttr && !row.classList.contains('notification')
+			})
+			
+			if (firstFileRow) {
+				console.log('[Time Archive] Sample file row structure:', firstFileRow)
+				console.log('[Time Archive] Sample file row attributes:', Array.from(firstFileRow.attributes).map(a => `${a.name}="${a.value}"`))
+				if (firstFileRow.dataset) {
+					console.log('[Time Archive] Sample file row dataset:', firstFileRow.dataset)
+				}
 			}
 		}
 		
-		// Try multiple selectors to find the file element
+		// Try multiple selectors to find the file element (only in Files app context)
 		const selectors = [
+			`.files-fileList [data-file-id="${fileInfo.id}"]`,
+			`.files-fileList [data-fileid="${fileInfo.id}"]`,
+			`.files-fileList [data-file="${fileInfo.id}"]`,
+			`.files-fileList tr[data-fileid="${fileInfo.id}"]`,
+			`.files-fileList tr[data-file="${fileInfo.id}"]`,
 			`[data-file-id="${fileInfo.id}"]`,
-			`[data-id="${fileInfo.id}"]`,
 			`[data-fileid="${fileInfo.id}"]`,
 			`[data-file="${fileInfo.id}"]`,
-			`tr[data-id="${fileInfo.id}"]`,
 			`tr[data-fileid="${fileInfo.id}"]`,
-			`.file[data-id="${fileInfo.id}"]`,
-			`.file[data-fileid="${fileInfo.id}"]`,
-			`[data-file-id='${fileInfo.id}']`, // Try with single quotes
-			`[data-id='${fileInfo.id}']`,
+			`tr[data-file="${fileInfo.id}"]`,
 		]
 		
 		for (const selector of selectors) {
 			try {
 				const element = document.querySelector(selector)
-				if (element) {
+				if (element && !element.classList.contains('notification')) {
 					console.log('[Time Archive] Found file element with selector:', selector, element)
 					return element
 				}
@@ -82,12 +102,16 @@ function autoOpenFile() {
 			}
 		}
 		
-		// Try finding in all rows by checking their data attributes
-		for (const row of allRows) {
-			const rowId = row.getAttribute('data-id') || 
-			             row.getAttribute('data-fileid') || 
-			             row.getAttribute('data-file-id') ||
-			             (row.dataset && (row.dataset.id || row.dataset.fileid || row.dataset.fileId))
+		// Try finding in file rows by checking their data attributes
+		for (const row of fileRows) {
+			// Skip notifications and other non-file elements
+			if (row.classList.contains('notification')) continue
+			
+			const rowId = row.getAttribute('data-fileid') || 
+			             row.getAttribute('data-file-id') || 
+			             row.getAttribute('data-file') ||
+			             row.getAttribute('data-id') ||
+			             (row.dataset && (row.dataset.fileid || row.dataset.fileId || row.dataset.file || row.dataset.id))
 			
 			if (rowId && (String(rowId) === String(fileInfo.id) || parseInt(rowId) === fileInfo.id)) {
 				console.log('[Time Archive] Found file element by checking row attributes:', row)
@@ -95,10 +119,13 @@ function autoOpenFile() {
 			}
 		}
 		
-		// Also try finding by file name if available
+		// Also try finding by file name if available (only in file rows)
 		if (fileInfo.name) {
 			// Try finding by text content (file name in table row)
-			for (const row of allRows) {
+			for (const row of fileRows) {
+				// Skip notifications
+				if (row.classList.contains('notification')) continue
+				
 				const text = row.textContent || row.innerText
 				if (text && text.trim().includes(fileInfo.name)) {
 					console.log('[Time Archive] Found file element by text content:', row)
@@ -107,7 +134,7 @@ function autoOpenFile() {
 			}
 		}
 		
-		console.log('[Time Archive] File element not found in DOM after checking', allRows.length, 'rows')
+		console.log('[Time Archive] File element not found in DOM after checking', fileRows.length, 'file rows')
 		return null
 	}
 	
@@ -132,11 +159,12 @@ function autoOpenFile() {
 		
 		if (attempts > 50) {
 			console.warn('[Time Archive] Could not open file after', attempts, 'attempts')
-			// Last resort: try direct download
+			// Last resort: try direct file preview route (not download, to avoid popup blocker)
 			if (fileInfo.id) {
-				console.log('[Time Archive] Attempting direct file download as last resort')
-				const downloadUrl = OC.generateUrl('/apps/files/ajax/download.php?files=' + fileInfo.id)
-				window.open(downloadUrl, '_blank')
+				console.log('[Time Archive] Attempting direct file preview as last resort')
+				// Use Nextcloud's file preview route instead of download
+				const previewUrl = OC.generateUrl('/apps/files/?fileid=' + fileInfo.id)
+				window.location.href = previewUrl
 			}
 			return
 		}
@@ -324,11 +352,11 @@ function autoOpenFile() {
 							hasElement: !!fileModel.$el
 						})
 						
-						// Last resort: try to open file via direct download URL
+						// Last resort: try to open file via direct preview route (not download, to avoid popup blocker)
 						if (fileInfo.id) {
-							console.log('[Time Archive] Attempting direct file download as fallback')
-							const downloadUrl = OC.generateUrl('/apps/files/ajax/download.php?files=' + fileInfo.id)
-							window.open(downloadUrl, '_blank')
+							console.log('[Time Archive] Attempting direct file preview as fallback')
+							const previewUrl = OC.generateUrl('/apps/files/?fileid=' + fileInfo.id)
+							window.location.href = previewUrl
 						}
 					}
 				} else {
