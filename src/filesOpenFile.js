@@ -291,7 +291,35 @@ function autoOpenFile() {
 						}
 					}
 					
-					// Method 1: If there's a link, click it or navigate to it
+					// Method 1: Try clicking the "View" button first (most reliable - it's the actual open button!)
+					if (!opened && buttonElement) {
+						try {
+							console.log('[Time Archive] Clicking View button:', buttonElement)
+							// Try direct click first
+							buttonElement.click()
+							console.log('[Time Archive] Clicked button element')
+							opened = true
+						} catch (e) {
+							console.warn('[Time Archive] Failed to click button:', e)
+							// Try dispatching click event as fallback
+							try {
+								const buttonClick = new MouseEvent('click', {
+									bubbles: true,
+									cancelable: true,
+									view: window,
+									button: 0,
+									buttons: 0
+								})
+								buttonElement.dispatchEvent(buttonClick)
+								console.log('[Time Archive] Dispatched click event on button')
+								opened = true
+							} catch (e2) {
+								console.warn('[Time Archive] Failed to dispatch click on button:', e2)
+							}
+						}
+					}
+					
+					// Method 2: If there's a link, click it or navigate to it
 					if (!opened && linkElement && linkElement.href) {
 						try {
 							console.log('[Time Archive] Found link, navigating to:', linkElement.href)
@@ -310,7 +338,7 @@ function autoOpenFile() {
 						}
 					}
 					
-					// Method 2: Try double-click on the row (Files app might listen to row clicks)
+					// Method 3: Try double-click on the row (Files app might listen to row clicks)
 					if (!opened) {
 						try {
 							const rect = fileElement.getBoundingClientRect()
@@ -334,7 +362,7 @@ function autoOpenFile() {
 						}
 					}
 					
-					// Method 3: Try double-click on name cell
+					// Method 4: Try double-click on name cell
 					if (!opened && nameCell) {
 						try {
 							const nameDblClick = new MouseEvent('dblclick', {
@@ -350,17 +378,6 @@ function autoOpenFile() {
 							opened = true
 						} catch (e) {
 							console.warn('[Time Archive] Failed to dispatch double-click on name cell:', e)
-						}
-					}
-					
-					// Method 4: Try clicking button if present
-					if (!opened && buttonElement) {
-						try {
-							buttonElement.click()
-							console.log('[Time Archive] Clicked button element')
-							opened = true
-						} catch (e) {
-							console.warn('[Time Archive] Failed to click button:', e)
 						}
 					}
 					
