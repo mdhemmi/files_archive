@@ -75,8 +75,9 @@ class Application extends App implements IBootstrap {
 		if ($isFilesPage) {
 			try {
 				Util::addScript(self::APP_ID, 'time_archive-archiveLink');
+				Util::addScript(self::APP_ID, 'time_archive-openFile');
 			} catch (\Exception $e) {
-				error_log('[Time Archive] Could not load archiveLink script: ' . $e->getMessage());
+				error_log('[Time Archive] Could not load Files app scripts: ' . $e->getMessage());
 			}
 		}
 	}

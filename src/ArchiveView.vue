@@ -166,8 +166,30 @@ export default {
 			return date.toLocaleDateString() + ' ' + date.toLocaleTimeString()
 		},
 		openFile(file) {
-			// Open file in Files app
-			window.location.href = OC.generateUrl('/apps/files/?dir=/.archive&openfile=' + file.id)
+			// Open file using Nextcloud's file preview/download mechanism
+			// First, try to open directly using the file ID
+			if (file.id) {
+				// Use Nextcloud's file preview URL
+				const previewUrl = OC.generateUrl('/apps/files/?dir=/.archive&fileid=' + file.id)
+				window.location.href = previewUrl
+				
+				// Store file info for auto-opening after Files app loads
+				sessionStorage.setItem('time_archive_open_file', JSON.stringify({
+					id: file.id,
+					name: file.name,
+					path: file.path,
+				}))
+			} else {
+				// Fallback: navigate to file location using path
+				const filePath = file.path || file.name
+				const fullPath = '/.archive/' + (filePath.startsWith('/') ? filePath.substring(1) : filePath)
+				const lastSlash = fullPath.lastIndexOf('/')
+				const dirPath = lastSlash > 0 ? fullPath.substring(0, lastSlash) : '/.archive'
+				const fileName = lastSlash > 0 ? fullPath.substring(lastSlash + 1) : fullPath.substring(1)
+				
+				const filesUrl = OC.generateUrl('/apps/files/?dir=' + encodeURIComponent(dirPath) + '&scrollto=' + encodeURIComponent(fileName))
+				window.location.href = filesUrl
+			}
 		},
 	},
 }
