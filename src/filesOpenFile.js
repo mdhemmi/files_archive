@@ -256,39 +256,88 @@ function autoOpenFile() {
 				
 				// Wait a bit for scroll, then try to open
 				setTimeout(() => {
-					// Try to find a clickable element within the row (link, button, or file name element)
-					const clickableElement = fileElement.querySelector('a, button, .file-name, .name, [role="button"], .files-list__row-name') || fileElement
+					// Try to find a link or button within the row that opens the file
+					const linkElement = fileElement.querySelector('a[href]')
+					const buttonElement = fileElement.querySelector('button')
+					const nameCell = fileElement.querySelector('.files-list__row-name, [data-cy-files-list-row-name]')
 					
-					console.log('[Time Archive] Clickable element found:', clickableElement)
-					console.log('[Time Archive] Clickable element tag:', clickableElement.tagName)
-					console.log('[Time Archive] Clickable element classes:', Array.from(clickableElement.classList))
+					console.log('[Time Archive] Link element found:', linkElement)
+					console.log('[Time Archive] Button element found:', buttonElement)
+					console.log('[Time Archive] Name cell found:', nameCell)
 					
 					// Try multiple methods to open the file
 					let opened = false
 					
-					// Method 1: Try double-click on the row (Files app might listen to row clicks)
-					try {
-						const dblClickEvent = new MouseEvent('dblclick', {
-							bubbles: true,
-							cancelable: true,
-							view: window,
-							detail: 2,
-							button: 0,
-							buttons: 0,
-							clientX: fileElement.getBoundingClientRect().left + fileElement.getBoundingClientRect().width / 2,
-							clientY: fileElement.getBoundingClientRect().top + fileElement.getBoundingClientRect().height / 2
-						})
-						fileElement.dispatchEvent(dblClickEvent)
-						console.log('[Time Archive] Dispatched double-click on row with coordinates')
-						opened = true
-					} catch (e) {
-						console.warn('[Time Archive] Failed to dispatch double-click on row:', e)
+					// Method 0: Try using Files app API if available (most reliable)
+					if (window.OCA && window.OCA.Files && window.OCA.Files.FileActions) {
+						try {
+							// Get file ID from row
+							const fileId = fileElement.getAttribute('data-cy-files-list-row-fileid')
+							if (fileId) {
+								// Try to find file in fileList
+								const fileList = window.OCA.Files.App?.fileList || window.OCA.Files.fileList
+								if (fileList && fileList.files) {
+									const fileModel = fileList.files.find(f => String(f.id) === String(fileId))
+									if (fileModel) {
+										console.log('[Time Archive] Found file model in fileList, using FileActions')
+										window.OCA.Files.FileActions.triggerAction('Open', fileModel)
+										console.log('[Time Archive] Triggered FileActions Open')
+										opened = true
+									}
+								}
+							}
+						} catch (e) {
+							console.warn('[Time Archive] FileActions API failed:', e)
+						}
 					}
 					
-					// Method 2: Try double-click on clickable element
-					if (!opened && clickableElement !== fileElement) {
+					// Method 1: If there's a link, click it or navigate to it
+					if (!opened && linkElement && linkElement.href) {
 						try {
-							const clickableDblClick = new MouseEvent('dblclick', {
+							console.log('[Time Archive] Found link, navigating to:', linkElement.href)
+							// Try clicking first
+							linkElement.click()
+							console.log('[Time Archive] Clicked link element')
+							// Also navigate as fallback
+							setTimeout(() => {
+								if (!opened) {
+									window.location.href = linkElement.href
+								}
+							}, 100)
+							opened = true
+						} catch (e) {
+							console.warn('[Time Archive] Failed to click/navigate link:', e)
+						}
+					}
+					
+					// Method 2: Try double-click on the row (Files app might listen to row clicks)
+					if (!opened) {
+						try {
+							const rect = fileElement.getBoundingClientRect()
+							const dblClickEvent = new MouseEvent('dblclick', {
+								bubbles: true,
+								cancelable: true,
+								view: window,
+								detail: 2,
+								button: 0,
+								buttons: 0,
+								clientX: rect.left + rect.width / 2,
+								clientY: rect.top + rect.height / 2,
+								screenX: rect.left + rect.width / 2,
+								screenY: rect.top + rect.height / 2
+							})
+							fileElement.dispatchEvent(dblClickEvent)
+							console.log('[Time Archive] Dispatched double-click on row with coordinates')
+							opened = true
+						} catch (e) {
+							console.warn('[Time Archive] Failed to dispatch double-click on row:', e)
+						}
+					}
+					
+					// Method 3: Try double-click on name cell
+					if (!opened && nameCell) {
+						try {
+							const nameDblClick = new MouseEvent('dblclick', {
 								bubbles: true,
 								cancelable: true,
 								view: window,
@@ -296,15 +345,26 @@ function autoOpenFile() {
 								button: 0,
 								buttons: 0
 							})
-							clickableElement.dispatchEvent(clickableDblClick)
-							console.log('[Time Archive] Dispatched double-click on clickable element')
+							nameCell.dispatchEvent(nameDblClick)
+							console.log('[Time Archive] Dispatched double-click on name cell')
 							opened = true
 						} catch (e) {
-							console.warn('[Time Archive] Failed to dispatch double-click on clickable:', e)
+							console.warn('[Time Archive] Failed to dispatch double-click on name cell:', e)
 						}
 					}
 					
-					// Method 3: Try single click on row
+					// Method 4: Try clicking button if present
+					if (!opened && buttonElement) {
+						try {
+							buttonElement.click()
+							console.log('[Time Archive] Clicked button element')
+							opened = true
+						} catch (e) {
+							console.warn('[Time Archive] Failed to click button:', e)
+						}
+					}
+					
+					// Method 5: Try single click on row
 					if (!opened) {
 						try {
 							const clickEvent = new MouseEvent('click', {
@@ -319,30 +379,6 @@ function autoOpenFile() {
 							opened = true
 						} catch (e) {
 							console.warn('[Time Archive] Failed to dispatch click on row:', e)
-						}
-					}
-					
-					// Method 4: Direct click() method
-					if (!opened) {
-						try {
-							if (clickableElement.click && typeof clickableElement.click === 'function') {
-								clickableElement.click()
-								console.log('[Time Archive] Called click() on clickable element')
-								opened = true
-							}
-						} catch (e) {
-							console.warn('[Time Archive] click() method failed:', e)
-						}
-					}
-					
-					// Method 5: If it's a link, navigate to it
-					if (!opened && clickableElement.tagName === 'A' && clickableElement.href) {
-						try {
-							console.log('[Time Archive] Clickable element is a link, navigating to:', clickableElement.href)
-							window.location.href = clickableElement.href
-							opened = true
-						} catch (e) {
-							console.warn('[Time Archive] Failed to navigate to link:', e)
 						}
 					}
 					
