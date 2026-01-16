@@ -50,6 +50,7 @@ jobs:
       - name: Update version in info.xml
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
+          sed -i '' "s|<version>.*</version>|<version>$VERSION</version>|g" appinfo/info.xml || \
           sed -i "s|<version>.*</version>|<version>$VERSION</version>|g" appinfo/info.xml
           echo "Updated appinfo/info.xml to version $VERSION"
 
