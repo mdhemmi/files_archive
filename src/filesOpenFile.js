@@ -23,20 +23,38 @@ function autoOpenFile() {
 		// Remove the flag so it doesn't trigger again
 		sessionStorage.removeItem('time_archive_open_file')
 		fileInfo = JSON.parse(fileInfoStr)
+		console.log('[Time Archive] File info from sessionStorage:', fileInfo)
 	} else if (openFileId) {
 		// Use file ID from URL parameter
 		fileInfo = { id: parseInt(openFileId) }
+		console.log('[Time Archive] File ID from URL parameter:', fileInfo.id)
 	} else {
+		console.log('[Time Archive] No file to open - no fileid in URL or sessionStorage')
 		return
 	}
 	
 	console.log('[Time Archive] Attempting to open file:', fileInfo)
 	
-	// Try to find file in DOM (simpler and more reliable approach)
+	// First, check if Nextcloud's file preview is already open
+	// If fileid is in URL, Nextcloud might handle it automatically
+	// But we'll still try to help it along
+	
+	// Try to find file in DOM - inspect actual DOM structure first
 	const tryFindInDOM = () => {
 		if (!fileInfo.id) return null
 		
-		console.log('[Time Archive] Searching DOM for file ID:', fileInfo.id)
+		// First, let's see what's actually in the DOM
+		const allRows = document.querySelectorAll('tbody tr, .files-fileList tr, table tr, .file-row, [data-fileid], [data-id]')
+		console.log('[Time Archive] Found', allRows.length, 'potential file rows in DOM')
+		
+		// Log first few rows to see their structure
+		if (allRows.length > 0) {
+			console.log('[Time Archive] Sample row structure:', allRows[0])
+			console.log('[Time Archive] Sample row attributes:', Array.from(allRows[0].attributes).map(a => `${a.name}="${a.value}"`))
+			if (allRows[0].dataset) {
+				console.log('[Time Archive] Sample row dataset:', allRows[0].dataset)
+			}
+		}
 		
 		// Try multiple selectors to find the file element
 		const selectors = [
@@ -48,52 +66,72 @@ function autoOpenFile() {
 			`tr[data-fileid="${fileInfo.id}"]`,
 			`.file[data-id="${fileInfo.id}"]`,
 			`.file[data-fileid="${fileInfo.id}"]`,
+			`[data-file-id='${fileInfo.id}']`, // Try with single quotes
+			`[data-id='${fileInfo.id}']`,
 		]
 		
 		for (const selector of selectors) {
-			const element = document.querySelector(selector)
-			if (element) {
-				console.log('[Time Archive] Found file element with selector:', selector, element)
-				return element
+			try {
+				const element = document.querySelector(selector)
+				if (element) {
+					console.log('[Time Archive] Found file element with selector:', selector, element)
+					return element
+				}
+			} catch (e) {
+				// Invalid selector, skip
+			}
+		}
+		
+		// Try finding in all rows by checking their data attributes
+		for (const row of allRows) {
+			const rowId = row.getAttribute('data-id') || 
+			             row.getAttribute('data-fileid') || 
+			             row.getAttribute('data-file-id') ||
+			             (row.dataset && (row.dataset.id || row.dataset.fileid || row.dataset.fileId))
+			
+			if (rowId && (String(rowId) === String(fileInfo.id) || parseInt(rowId) === fileInfo.id)) {
+				console.log('[Time Archive] Found file element by checking row attributes:', row)
+				return row
 			}
 		}
 		
 		// Also try finding by file name if available
 		if (fileInfo.name) {
-			console.log('[Time Archive] Searching DOM for file name:', fileInfo.name)
-			const nameSelectors = [
-				`[data-file-name="${fileInfo.name}"]`,
-				`[data-name="${fileInfo.name}"]`,
-				`tr[data-file="${fileInfo.name}"]`,
-			]
-			
-			for (const selector of nameSelectors) {
-				const element = document.querySelector(selector)
-				if (element) {
-					console.log('[Time Archive] Found file element by name with selector:', selector, element)
-					return element
-				}
-			}
-			
 			// Try finding by text content (file name in table row)
-			const allRows = document.querySelectorAll('tbody tr, .files-fileList tr, table tr')
 			for (const row of allRows) {
 				const text = row.textContent || row.innerText
-				if (text && text.includes(fileInfo.name)) {
+				if (text && text.trim().includes(fileInfo.name)) {
 					console.log('[Time Archive] Found file element by text content:', row)
 					return row
 				}
 			}
 		}
 		
-		console.log('[Time Archive] File element not found in DOM')
+		console.log('[Time Archive] File element not found in DOM after checking', allRows.length, 'rows')
 		return null
+	}
+	
+	// Check if file preview is already open (Nextcloud might handle fileid automatically)
+	const checkPreviewOpen = () => {
+		// Check if there's a file preview/viewer open
+		const preview = document.querySelector('.viewer-container, .file-viewer, .preview-container, #viewer')
+		if (preview) {
+			console.log('[Time Archive] File preview appears to be open:', preview)
+			return true
+		}
+		return false
 	}
 	
 	// Wait for Files app to be fully loaded
 	const tryOpen = (attempts = 0) => {
-		if (attempts > 300) {
-			console.warn('[Time Archive] Files app did not load in time to open file after', attempts, 'attempts')
+		// Check if preview is already open (Nextcloud might have handled it)
+		if (checkPreviewOpen()) {
+			console.log('[Time Archive] File preview is already open - Nextcloud handled fileid parameter')
+			return
+		}
+		
+		if (attempts > 50) {
+			console.warn('[Time Archive] Could not open file after', attempts, 'attempts')
 			// Last resort: try direct download
 			if (fileInfo.id) {
 				console.log('[Time Archive] Attempting direct file download as last resort')
@@ -301,12 +339,24 @@ function autoOpenFile() {
 		} else {
 			// Files app API not available, but we can still try DOM approach
 			// Continue trying to find file in DOM
-			if (attempts % 20 === 0) {
+			if (attempts % 10 === 0) {
 				console.log('[Time Archive] Waiting for file to appear in DOM... attempt', attempts)
-				console.log('[Time Archive] DOM ready state:', document.readyState)
+				console.log('[Time Archive] Current URL:', window.location.href)
 				console.log('[Time Archive] File table rows found:', document.querySelectorAll('tbody tr, .files-fileList tr').length)
+				
+				// Check if we're in the right directory
+				if (fileInfo.dir) {
+					const currentDir = new URLSearchParams(window.location.search).get('dir')
+					if (currentDir !== fileInfo.dir) {
+						console.log('[Time Archive] Not in correct directory. Current:', currentDir, 'Expected:', fileInfo.dir)
+						// Navigate to correct directory
+						const correctUrl = OC.generateUrl('/apps/files/?dir=' + encodeURIComponent(fileInfo.dir) + '&fileid=' + fileInfo.id)
+						window.location.href = correctUrl
+						return
+					}
+				}
 			}
-			setTimeout(() => tryOpen(attempts + 1), 100)
+			setTimeout(() => tryOpen(attempts + 1), 200)
 		}
 	}
 	

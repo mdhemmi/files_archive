@@ -169,19 +169,28 @@ export default {
 		openFile(file) {
 			// Open file using Nextcloud's file preview mechanism
 			if (file.id) {
-				// Try using Nextcloud's file preview route directly
-				// This should open the file in the preview/viewer
-				const previewUrl = generateUrl('/apps/files/?fileid=' + file.id)
+				// Use Nextcloud's file preview route: files.viewcontroller.showFile
+				// This route opens the file directly in the preview/viewer
+				// Format: /apps/files/?fileid=<id> or /apps/files/files?fileid=<id>
+				const filePath = file.path || file.name
+				const fullPath = '/.archive/' + (filePath.startsWith('/') ? filePath.substring(1) : filePath)
+				const lastSlash = fullPath.lastIndexOf('/')
+				const dirPath = lastSlash > 0 ? fullPath.substring(0, lastSlash) : '/.archive'
+				
+				// Navigate to Files app with both directory and fileid
+				// Nextcloud should handle the fileid parameter to open the file
+				const filesUrl = generateUrl('/apps/files/?dir=' + encodeURIComponent(dirPath) + '&fileid=' + file.id)
 				
 				// Store file info for auto-opening script as backup
 				sessionStorage.setItem('time_archive_open_file', JSON.stringify({
 					id: file.id,
 					name: file.name,
 					path: file.path,
+					dir: dirPath,
 				}))
 				
 				// Navigate to file preview
-				window.location.href = previewUrl
+				window.location.href = filesUrl
 			} else {
 				// Fallback: navigate to file location using path
 				const filePath = file.path || file.name
