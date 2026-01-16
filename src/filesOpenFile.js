@@ -7,7 +7,10 @@
  * Auto-open file after navigating to Files app from Archive view
  * This script runs in the Files app and checks if we need to open a file
  */
+console.log('[Time Archive] filesOpenFile.js loaded')
+
 function autoOpenFile() {
+	console.log('[Time Archive] autoOpenFile() called')
 	// Check URL parameters first
 	const urlParams = new URLSearchParams(window.location.search)
 	const openFileId = urlParams.get('openfile') || urlParams.get('fileid')
@@ -31,8 +34,8 @@ function autoOpenFile() {
 	
 	// Wait for Files app to be fully loaded
 	const tryOpen = (attempts = 0) => {
-		if (attempts > 50) {
-			console.warn('[Time Archive] Files app did not load in time to open file')
+		if (attempts > 100) {
+			console.warn('[Time Archive] Files app did not load in time to open file after', attempts, 'attempts')
 			return
 		}
 		
@@ -151,6 +154,13 @@ function autoOpenFile() {
 							hasOpen: typeof fileList.open === 'function',
 							hasElement: !!fileModel.$el
 						})
+						
+						// Last resort: try to open file via direct download URL
+						if (fileInfo.id) {
+							console.log('[Time Archive] Attempting direct file download as fallback')
+							const downloadUrl = OC.generateUrl('/apps/files/ajax/download.php?files=' + fileInfo.id)
+							window.open(downloadUrl, '_blank')
+						}
 					}
 				} else {
 					console.warn('[Time Archive] File not found in file list. ID:', fileInfo.id, 'Name:', fileInfo.name)
