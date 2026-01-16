@@ -18,102 +18,8 @@ function addArchiveLink() {
 
 	// Wait for Files app to load
 	const init = () => {
-		// Try multiple locations to add the Archive link
-		
-		// Method 1: Add to Files app header/toolbar
-		const filesHeader = document.querySelector('.files-controls') || 
-		                   document.querySelector('.files-list__header') ||
-		                   document.querySelector('.files-list-header') ||
-		                   document.querySelector('.app-files-header') ||
-		                   document.querySelector('[class*="files-header"]') ||
-		                   document.querySelector('[class*="app-content"]')
-		
-		if (filesHeader) {
-			// Check if link already exists
-			if (filesHeader.querySelector('.files-archive-link')) {
-				return
-			}
-			
-			const archiveLink = document.createElement('a')
-			archiveLink.className = 'files-archive-link'
-			archiveLink.href = generateUrl('/apps/time_archive/')
-			archiveLink.title = t('time_archive', 'View archived files')
-			archiveLink.innerHTML = `
-				<span class="icon-archive" style="margin-right: 4px;"></span>
-				${t('time_archive', 'Archive')}
-			`
-			archiveLink.style.cssText = `
-				display: inline-flex;
-				align-items: center;
-				padding: 8px 16px;
-				margin: 8px;
-				background-color: var(--color-primary-element, #0082c9);
-				color: var(--color-primary-element-text, #ffffff);
-				border-radius: var(--border-radius, 3px);
-				text-decoration: none;
-				font-weight: 500;
-				transition: opacity 0.2s;
-			`
-			archiveLink.addEventListener('mouseenter', () => {
-				archiveLink.style.opacity = '0.8'
-			})
-			archiveLink.addEventListener('mouseleave', () => {
-				archiveLink.style.opacity = '1'
-			})
-			
-			// Try to insert at the beginning or after existing controls
-			const controls = filesHeader.querySelector('.files-controls') || 
-			                filesHeader.querySelector('.files-list__header-actions') ||
-			                filesHeader
-			
-			if (controls) {
-				// Insert at the beginning if possible, otherwise append
-				if (controls.firstChild) {
-					controls.insertBefore(archiveLink, controls.firstChild)
-				} else {
-					controls.appendChild(archiveLink)
-				}
-				console.log('[Files Archive] Archive link added to Files app header')
-				return
-			}
-		}
-		
-		// Method 2: Add to sidebar if available
-		const sidebar = document.querySelector('.app-sidebar') ||
-		               document.querySelector('.app-navigation') ||
-		               document.querySelector('[class*="sidebar"]')
-		
-		if (sidebar && !sidebar.querySelector('.files-archive-link')) {
-			const archiveLink = document.createElement('a')
-			archiveLink.className = 'files-archive-link'
-			archiveLink.href = generateUrl('/apps/time_archive/')
-			archiveLink.title = t('time_archive', 'View archived files')
-			archiveLink.innerHTML = `
-				<span class="icon-archive" style="margin-right: 8px;"></span>
-				${t('time_archive', 'Archive')}
-			`
-			archiveLink.style.cssText = `
-				display: flex;
-				align-items: center;
-				padding: 12px 16px;
-				color: var(--color-main-text, #000000);
-				text-decoration: none;
-				border-bottom: 1px solid var(--color-border, #e5e5e5);
-				font-weight: 500;
-			`
-			archiveLink.addEventListener('mouseenter', () => {
-				archiveLink.style.backgroundColor = 'var(--color-background-hover, #f5f5f5)'
-			})
-			archiveLink.addEventListener('mouseleave', () => {
-				archiveLink.style.backgroundColor = 'transparent'
-			})
-			
-			sidebar.insertBefore(archiveLink, sidebar.firstChild)
-			console.log('[Files Archive] Archive link added to sidebar')
-			return
-		}
-		
-		// Method 3: Add as a floating button (last resort)
+		// Only add the floating button (bottom-right corner)
+		// Skip header and sidebar methods to avoid duplicate buttons
 		if (!document.querySelector('.files-archive-floating-link')) {
 			const floatingLink = document.createElement('a')
 			floatingLink.className = 'files-archive-floating-link'
@@ -178,8 +84,7 @@ function addArchiveLink() {
 
 	// Listen for Files app navigation changes
 	const observer = new MutationObserver(() => {
-		if (!document.querySelector('.files-archive-link') && 
-		    !document.querySelector('.files-archive-floating-link')) {
+		if (!document.querySelector('.files-archive-floating-link')) {
 			init()
 		}
 	})
