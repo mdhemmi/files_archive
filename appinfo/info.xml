@@ -32,12 +32,6 @@
 
 	<bootstrap>OCA\Time_Archive\AppInfo\Application</bootstrap>
 
-	<navigation>
-		<name>Archive</name>
-		<route>Page#index</route>
-		<order>100</order>
-	</navigation>
-
 	<settings>
 		<admin>OCA\Time_Archive\Settings\Admin</admin>
 	</settings>

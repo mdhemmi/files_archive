@@ -65,8 +65,20 @@ class Application extends App implements IBootstrap {
 		// 	}
 		// }
 		// 
-		// Note: archiveLink is also optional - uncomment if needed after verifying file exists
-		// Util::addScript(self::APP_ID, 'archiveLink');
+		// Load archiveLink script to add floating button in Files app
+		// This creates a floating button in the bottom-right corner of the Files app
+		$requestUri = $_SERVER['REQUEST_URI'] ?? $_SERVER['SCRIPT_NAME'] ?? '';
+		$isFilesPage = strpos($requestUri, '/apps/files') !== false || 
+		               strpos($requestUri, '/index.php/apps/files') !== false ||
+		               (isset($_GET['app']) && $_GET['app'] === 'files');
+		
+		if ($isFilesPage) {
+			try {
+				Util::addScript(self::APP_ID, 'time_archive-archiveLink');
+			} catch (\Exception $e) {
+				error_log('[Time Archive] Could not load archiveLink script: ' . $e->getMessage());
+			}
+		}
 	}
 }
 
