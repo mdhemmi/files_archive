@@ -30,7 +30,7 @@ An app for Nextcloud to automatically archive files based on file age. Archived 
 1. Clone or download the app:
 ```bash
 cd /path/to/nextcloud/apps
-git clone https://github.com/nextcloud/time_archive.git
+git clone https://github.com/mdhemmi/time_archive.git
 ```
 
 2. Install PHP dependencies:

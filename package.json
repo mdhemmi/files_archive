@@ -1,7 +1,7 @@
 {
   "name": "time_archive",
   "version": "1.0.0",
-  "author": "Nextcloud Contributors",
+  "author": "Michael Hempel",
   "license": "agpl",
   "private": true,
   "scripts": {
