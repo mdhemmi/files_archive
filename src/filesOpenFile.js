@@ -53,34 +53,29 @@ function autoOpenFile() {
 	// If fileid is in URL, Nextcloud might handle it automatically
 	// But we'll still try to help it along
 	
-	// Try to find file in DOM - inspect all table rows to find the right structure
+	// Try to find file in DOM - check all table rows, not just filtered ones
 	const tryFindInDOM = () => {
 		if (!fileInfo.id) return null
 		
-		// First, get ALL table rows to see what we're working with
-		const allTableRows = document.querySelectorAll('tbody tr, table tr')
+		// Get ALL table rows (Files app uses various structures)
+		const allTableRows = document.querySelectorAll('tbody tr, table tr, .files-list tr')
 		console.log('[Time Archive] Found', allTableRows.length, 'total table rows in DOM')
 		
-		// Filter out notifications and find actual file rows
+		// Filter out headers and non-file rows
 		const fileRows = Array.from(allTableRows).filter(row => {
-			// Skip notifications
-			if (row.classList.contains('notification')) return false
-			// Skip if it's clearly not a file row (e.g., header, empty, etc.)
-			if (row.classList.contains('header') || row.classList.contains('empty')) return false
-			// Check if it has file-related attributes or is in Files app context
-			const hasFileAttr = row.hasAttribute('data-file') || 
-			                   row.hasAttribute('data-fileid') || 
-			                   row.hasAttribute('data-file-id') ||
-			                   row.hasAttribute('data-id') ||
-			                   row.classList.contains('file-row') ||
-			                   row.closest('.files-fileList') !== null ||
-			                   row.closest('#fileList') !== null
-			return hasFileAttr
+			// Skip header rows
+			if (row.classList.contains('files-list_row-head') || 
+			    row.classList.contains('header') || 
+			    row.classList.contains('notification')) {
+				return false
+			}
+			// Include all other rows (they might be file rows)
+			return true
 		})
 		
-		console.log('[Time Archive] Found', fileRows.length, 'potential file rows (after filtering)')
+		console.log('[Time Archive] Found', fileRows.length, 'potential file rows (after filtering headers)')
 		
-		// Log first few file rows to see their structure
+		// Log structure of first few file rows to understand the DOM
 		if (fileRows.length > 0) {
 			const firstFileRow = fileRows[0]
 			console.log('[Time Archive] Sample file row:', firstFileRow)
@@ -89,18 +84,6 @@ function autoOpenFile() {
 			if (firstFileRow.dataset) {
 				console.log('[Time Archive] Sample file row dataset:', Object.keys(firstFileRow.dataset).map(k => `${k}=${firstFileRow.dataset[k]}`))
 			}
-			// Check what the data-id or data-fileid actually contains
-			const rowId = firstFileRow.getAttribute('data-id') || 
-			             firstFileRow.getAttribute('data-fileid') || 
-			             firstFileRow.getAttribute('data-file-id') ||
-			             firstFileRow.getAttribute('data-file')
-			console.log('[Time Archive] Sample file row ID attribute:', rowId)
-		} else if (allTableRows.length > 0) {
-			// If we found table rows but no file rows, log the first one to see what it is
-			const firstRow = allTableRows[0]
-			console.log('[Time Archive] First table row (not a file row):', firstRow)
-			console.log('[Time Archive] First row classes:', Array.from(firstRow.classList))
-			console.log('[Time Archive] First row attributes:', Array.from(firstRow.attributes).map(a => `${a.name}="${a.value}"`))
 		}
 		
 		// Try multiple selectors to find the file element
@@ -127,47 +110,54 @@ function autoOpenFile() {
 			}
 		}
 		
-		// Try finding in all table rows by checking their data attributes
-		// Check both fileRows and allTableRows (in case our filter was too strict)
-		const rowsToCheck = fileRows.length > 0 ? fileRows : Array.from(allTableRows).filter(r => !r.classList.contains('notification'))
-		
-		for (const row of rowsToCheck) {
-			// Skip notifications
-			if (row.classList.contains('notification')) continue
+		// Try finding by file ID in all rows (check all attributes and even text content)
+		for (const row of fileRows) {
+			// Skip headers
+			if (row.classList.contains('files-list_row-head') || row.classList.contains('header')) continue
 			
 			// Check all possible ID attributes
 			const rowId = row.getAttribute('data-fileid') || 
 			             row.getAttribute('data-file-id') || 
 			             row.getAttribute('data-file') ||
 			             row.getAttribute('data-id') ||
+			             row.getAttribute('id') ||
 			             (row.dataset && (row.dataset.fileid || row.dataset.fileId || row.dataset.file || row.dataset.id))
 			
 			// Try to match the ID (as string or number)
 			if (rowId) {
 				const rowIdNum = parseInt(rowId)
 				if (rowIdNum === fileInfo.id || String(rowId) === String(fileInfo.id)) {
-					console.log('[Time Archive] Found file element by checking row attributes. Row ID:', rowId, 'Target ID:', fileInfo.id, 'Row:', row)
+					console.log('[Time Archive] Found file element by ID attribute. Row ID:', rowId, 'Target ID:', fileInfo.id, 'Row:', row)
 					return row
 				}
 			}
+			
+			// Also check if the file ID appears anywhere in the row (in case it's in a nested element)
+			const rowText = row.textContent || row.innerText || ''
+			if (rowText.includes(String(fileInfo.id))) {
+				console.log('[Time Archive] Found file element by ID in text content. Row:', row)
+				return row
+			}
 		}
 		
-		// Also try finding by file name if available (only in file rows)
+		// Also try finding by file name if available
 		if (fileInfo.name) {
-			// Try finding by text content (file name in table row)
+			console.log('[Time Archive] Searching for file by name:', fileInfo.name)
 			for (const row of fileRows) {
-				// Skip notifications
-				if (row.classList.contains('notification')) continue
+				// Skip headers
+				if (row.classList.contains('files-list_row-head') || row.classList.contains('header')) continue
 				
-				const text = row.textContent || row.innerText
+				const text = row.textContent || row.innerText || ''
+				// Check if the file name appears in the row text
 				if (text && text.trim().includes(fileInfo.name)) {
-					console.log('[Time Archive] Found file element by text content:', row)
+					console.log('[Time Archive] Found file element by name in text content. Row:', row)
 					return row
 				}
 			}
 		}
 		
 		console.log('[Time Archive] File element not found in DOM after checking', fileRows.length, 'file rows')
+		console.log('[Time Archive] File ID:', fileInfo.id, 'File name:', fileInfo.name)
 		return null
 	}
 	
