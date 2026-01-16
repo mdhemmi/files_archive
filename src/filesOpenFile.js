@@ -11,9 +11,17 @@ console.log('[Time Archive] filesOpenFile.js loaded')
 
 function autoOpenFile() {
 	console.log('[Time Archive] autoOpenFile() called')
-	// Check URL parameters first
+	
+	// Prevent infinite loops - check if we've already tried to open this file
 	const urlParams = new URLSearchParams(window.location.search)
 	const openFileId = urlParams.get('openfile') || urlParams.get('fileid')
+	const alreadyTriedKey = 'time_archive_already_tried_' + (openFileId || 'unknown')
+	
+	if (sessionStorage.getItem(alreadyTriedKey)) {
+		console.log('[Time Archive] Already attempted to open this file, skipping to prevent loop')
+		sessionStorage.removeItem(alreadyTriedKey) // Clean up
+		return
+	}
 	
 	// Check if we have a file to open from Archive view (sessionStorage or URL)
 	let fileInfo = null
@@ -24,10 +32,16 @@ function autoOpenFile() {
 		sessionStorage.removeItem('time_archive_open_file')
 		fileInfo = JSON.parse(fileInfoStr)
 		console.log('[Time Archive] File info from sessionStorage:', fileInfo)
+		// Mark that we're trying this file
+		if (fileInfo.id) {
+			sessionStorage.setItem('time_archive_already_tried_' + fileInfo.id, 'true')
+		}
 	} else if (openFileId) {
 		// Use file ID from URL parameter
 		fileInfo = { id: parseInt(openFileId) }
 		console.log('[Time Archive] File ID from URL parameter:', fileInfo.id)
+		// Mark that we're trying this file
+		sessionStorage.setItem(alreadyTriedKey, 'true')
 	} else {
 		console.log('[Time Archive] No file to open - no fileid in URL or sessionStorage')
 		return
@@ -159,12 +173,13 @@ function autoOpenFile() {
 		
 		if (attempts > 50) {
 			console.warn('[Time Archive] Could not open file after', attempts, 'attempts')
-			// Last resort: try direct file preview route (not download, to avoid popup blocker)
+			console.warn('[Time Archive] File ID:', fileInfo.id, 'Name:', fileInfo.name)
+			console.warn('[Time Archive] Please manually open the file from the Files app')
+			// Don't navigate anywhere - that would cause an infinite loop
+			// Just log the error and let the user manually open the file
+			// Clean up the flag
 			if (fileInfo.id) {
-				console.log('[Time Archive] Attempting direct file preview as last resort')
-				// Use Nextcloud's file preview route instead of download
-				const previewUrl = OC.generateUrl('/apps/files/?fileid=' + fileInfo.id)
-				window.location.href = previewUrl
+				sessionStorage.removeItem('time_archive_already_tried_' + fileInfo.id)
 			}
 			return
 		}
@@ -352,11 +367,13 @@ function autoOpenFile() {
 							hasElement: !!fileModel.$el
 						})
 						
-						// Last resort: try to open file via direct preview route (not download, to avoid popup blocker)
+						// Last resort: log error and stop (don't navigate to avoid loop)
 						if (fileInfo.id) {
-							console.log('[Time Archive] Attempting direct file preview as fallback')
-							const previewUrl = OC.generateUrl('/apps/files/?fileid=' + fileInfo.id)
-							window.location.href = previewUrl
+							console.warn('[Time Archive] Could not open file - all methods failed')
+							console.warn('[Time Archive] File ID:', fileInfo.id, 'Name:', fileInfo.name)
+							console.warn('[Time Archive] Please manually open the file from the Files app')
+							// Clean up the flag
+							sessionStorage.removeItem('time_archive_already_tried_' + fileInfo.id)
 						}
 					}
 				} else {
