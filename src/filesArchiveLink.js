@@ -26,7 +26,6 @@ function addArchiveLink() {
 			floatingLink.href = generateUrl('/apps/time_archive/')
 			floatingLink.title = t('time_archive', 'View archived files')
 			floatingLink.innerHTML = `
-				<span class="icon-archive"></span>
 				<span class="files-archive-floating-text">${t('time_archive', 'Archive')}</span>
 			`
 			floatingLink.style.cssText = `
@@ -37,7 +36,6 @@ function addArchiveLink() {
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				gap: 8px;
 				padding: 12px 20px;
 				background-color: var(--color-primary-element, #0082c9);
 				color: var(--color-primary-element-text, #ffffff);
@@ -46,6 +44,8 @@ function addArchiveLink() {
 				font-weight: 500;
 				box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 				transition: transform 0.2s, box-shadow 0.2s;
+				text-align: center;
+				min-width: 100px;
 			`
 			floatingLink.addEventListener('mouseenter', () => {
 				floatingLink.style.transform = 'scale(1.05)'
@@ -56,12 +56,19 @@ function addArchiveLink() {
 				floatingLink.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)'
 			})
 			
-			// Hide text on small screens
+			// Style the text span to ensure proper centering
 			const textSpan = floatingLink.querySelector('.files-archive-floating-text')
 			if (textSpan) {
+				textSpan.style.cssText = `
+					display: block;
+					text-align: center;
+					width: 100%;
+				`
+				
+				// Hide text on small screens
 				const mediaQuery = window.matchMedia('(max-width: 768px)')
 				const handleResize = (e) => {
-					textSpan.style.display = e.matches ? 'none' : 'inline'
+					textSpan.style.display = e.matches ? 'none' : 'block'
 				}
 				mediaQuery.addEventListener('change', handleResize)
 				handleResize(mediaQuery)
