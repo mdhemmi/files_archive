@@ -18,6 +18,7 @@ use OCP\Files\Config\IUserMountCache;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\Node;
+use OCP\Files\LockedException;
 use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
 use OCP\IDBConnection;
@@ -314,9 +315,17 @@ class ArchiveJob extends TimedJob {
 					$this->removeTagFromFile($node->getId(), $tagId);
 				}
 				return true;
+			} catch (LockedException $e) {
+				// File is locked (being accessed/synced) - will retry in next run
+				$this->logger->warning('File ' . $node->getId() . ' is locked and could not be archived. Will retry in next archive run.', [
+					'exception' => $e,
+					'filePath' => $node->getPath(),
+				]);
+				return false;
 			} catch (Exception $e) {
 				$this->logger->error('Failed to archive file ' . $node->getId() . ': ' . $e->getMessage(), [
 					'exception' => $e,
+					'filePath' => $node->getPath(),
 				]);
 				return false;
 			}
@@ -327,9 +336,9 @@ class ArchiveJob extends TimedJob {
 	}
 
 	/**
-	 * Move a node to the archive folder
+	 * Move a node to the archive folder with retry logic for locked files
 	 */
-	private function moveToArchive(Node $node): void {
+	private function moveToArchive(Node $node, int $maxRetries = 3, int $retryDelay = 2): void {
 		$userId = $node->getOwner()->getUID();
 		$userFolder = $this->rootFolder->getUserFolder($userId);
 
@@ -419,8 +428,56 @@ class ArchiveJob extends TimedJob {
 			$uniqueName = $baseName . ' (' . $counter . ')' . ($extension ? '.' . $extension : '');
 		}
 
-		$node->move($targetFolder->getPath() . '/' . $uniqueName);
-		$this->logger->debug('Archived file ' . $node->getId() . ' to ' . $targetFolder->getPath() . '/' . $uniqueName);
+		// Try to move with retry logic for locked files
+		$attempt = 0;
+		$lastException = null;
+		
+		while ($attempt < $maxRetries) {
+			try {
+				$node->move($targetFolder->getPath() . '/' . $uniqueName);
+				$this->logger->debug('Archived file ' . $node->getId() . ' to ' . $targetFolder->getPath() . '/' . $uniqueName);
+				return; // Success, exit the method
+			} catch (LockedException $e) {
+				$attempt++;
+				$lastException = $e;
+				
+				if ($attempt < $maxRetries) {
+					// Calculate exponential backoff delay: 2s, 4s, 8s
+					$delay = $retryDelay * (2 ** ($attempt - 1));
+					$this->logger->info('File ' . $node->getId() . ' is locked, retrying in ' . $delay . ' seconds (attempt ' . $attempt . '/' . $maxRetries . ')', [
+						'exception' => $e,
+						'filePath' => $node->getPath(),
+					]);
+					
+					// Wait before retrying
+					sleep($delay);
+					
+					// Re-fetch the node in case it changed
+					try {
+						$userId = $node->getOwner()->getUID();
+						$userFolder = $this->rootFolder->getUserFolder($userId);
+						$nodes = $userFolder->getById($node->getId());
+						if (!empty($nodes)) {
+							$node = $nodes[0];
+						}
+					} catch (Exception $refreshException) {
+						$this->logger->warning('Could not refresh node before retry: ' . $refreshException->getMessage());
+					}
+				} else {
+					// Max retries reached
+					$this->logger->warning('File ' . $node->getId() . ' is locked after ' . $maxRetries . ' attempts, skipping. File will be archived in next run.', [
+						'exception' => $e,
+						'filePath' => $node->getPath(),
+					]);
+					throw $e; // Re-throw to be caught by archiveNode
+				}
+			}
+		}
+		
+		// Should not reach here, but just in case
+		if ($lastException !== null) {
+			throw $lastException;
+		}
 	}
 
 	/**
