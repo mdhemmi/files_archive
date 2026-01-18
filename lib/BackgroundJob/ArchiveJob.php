@@ -150,13 +150,14 @@ class ArchiveJob extends TimedJob {
 	/**
 	 * Archive files based on time for all users
 	 * 
-	 * @return array{usersProcessed: int, filesArchived: int, filesChecked: int}
+	 * @return array{usersProcessed: int, filesArchived: int, filesChecked: int, foldersArchived: int}
 	 */
 	private function archiveByTime(\DateTime $archiveBefore, int $timeAfter): array {
 		$stats = [
 			'usersProcessed' => 0,
 			'filesArchived' => 0,
 			'filesChecked' => 0,
+			'foldersArchived' => 0,
 		];
 		
 		error_log("Time Archive: Starting to process all users. Archive threshold: " . $archiveBefore->format('Y-m-d H:i:s'));
@@ -174,9 +175,10 @@ class ArchiveJob extends TimedJob {
 				$stats['usersProcessed']++;
 				$stats['filesArchived'] += $userStats['filesArchived'];
 				$stats['filesChecked'] += $userStats['filesChecked'];
+				$stats['foldersArchived'] += $userStats['foldersArchived'];
 				
-				if ($userStats['filesChecked'] > 0) {
-					error_log("Time Archive: User $userId - Checked: {$userStats['filesChecked']}, Archived: {$userStats['filesArchived']}");
+				if ($userStats['filesChecked'] > 0 || $userStats['foldersArchived'] > 0) {
+					error_log("Time Archive: User $userId - Checked: {$userStats['filesChecked']}, Files archived: {$userStats['filesArchived']}, Folders archived: {$userStats['foldersArchived']}");
 				}
 			} catch (Exception $e) {
 				$errorMsg = "Failed to archive files for user $userId: " . $e->getMessage();
@@ -187,20 +189,22 @@ class ArchiveJob extends TimedJob {
 			}
 		});
 		
-		error_log("Time Archive: Completed processing. Total users: {$stats['usersProcessed']}, Files checked: {$stats['filesChecked']}, Files archived: {$stats['filesArchived']}");
+		error_log("Time Archive: Completed processing. Total users: {$stats['usersProcessed']}, Files checked: {$stats['filesChecked']}, Files archived: {$stats['filesArchived']}, Folders archived: {$stats['foldersArchived']}");
 		
 		return $stats;
 	}
 
 	/**
 	 * Recursively archive files in a folder
+	 * After archiving files, checks if folder is empty and archives it if it meets criteria
 	 * 
-	 * @return array{filesArchived: int, filesChecked: int}
+	 * @return array{filesArchived: int, filesChecked: int, foldersArchived: int}
 	 */
 	private function archiveUserFolder(Folder $folder, \DateTime $archiveBefore, int $timeAfter, string $userId): array {
 		$stats = [
 			'filesArchived' => 0,
 			'filesChecked' => 0,
+			'foldersArchived' => 0,
 		];
 		
 		// Skip the archive folder itself
@@ -220,6 +224,7 @@ class ArchiveJob extends TimedJob {
 				$subStats = $this->archiveUserFolder($node, $archiveBefore, $timeAfter, $userId);
 				$stats['filesArchived'] += $subStats['filesArchived'];
 				$stats['filesChecked'] += $subStats['filesChecked'];
+				$stats['foldersArchived'] += $subStats['foldersArchived'];
 			} else {
 				// Check and archive file
 				$stats['filesChecked']++;
@@ -228,6 +233,42 @@ class ArchiveJob extends TimedJob {
 					$stats['filesArchived']++;
 				}
 			}
+		}
+		
+		// After processing all files and subfolders, check if this folder is now empty
+		// and should be archived
+		try {
+			// Re-fetch the folder to get current state (files may have been moved)
+			$currentNodes = $folder->getDirectoryListing();
+			$remainingNodes = array_filter($currentNodes, function($node) {
+				// Count only nodes that are not in the archive folder
+				return strpos($node->getPath(), '/' . Constants::ARCHIVE_FOLDER . '/') === false;
+			});
+			
+			// If folder is now empty (or only contains .archive folder references)
+			if (empty($remainingNodes)) {
+				// Check if folder meets archive criteria based on its modification time
+				$folderTime = $this->getDateFromNode($folder, $timeAfter);
+				
+				if ($folderTime < $archiveBefore) {
+					$this->logger->debug('Folder ' . $folder->getId() . ' is empty and meets archive criteria, archiving folder');
+					try {
+						$this->moveToArchive($folder, 3, 2);
+						$stats['foldersArchived']++;
+						$this->logger->info('Archived empty folder ' . $folder->getId() . ' (' . $folder->getPath() . ')');
+					} catch (Exception $e) {
+						$this->logger->warning('Failed to archive empty folder ' . $folder->getId() . ': ' . $e->getMessage(), [
+							'exception' => $e,
+							'folderPath' => $folder->getPath(),
+						]);
+					}
+				} else {
+					$this->logger->debug('Folder ' . $folder->getId() . ' is empty but does not meet archive criteria (age: ' . $folderTime->format('Y-m-d') . ', threshold: ' . $archiveBefore->format('Y-m-d') . ')');
+				}
+			}
+		} catch (Exception $e) {
+			// If we can't check folder state, log but don't fail
+			$this->logger->debug('Could not check if folder ' . $folder->getId() . ' is empty: ' . $e->getMessage());
 		}
 		
 		return $stats;
@@ -389,6 +430,7 @@ class ArchiveJob extends TimedJob {
 			$relativePath = $node->getName();
 		}
 
+		$isFolder = $node instanceof Folder;
 		$relativeDir = trim(\dirname($relativePath), '/');
 		$fileName = \basename($relativePath);
 
@@ -429,16 +471,25 @@ class ArchiveJob extends TimedJob {
 			}
 		}
 
-		// Generate unique filename to avoid conflicts inside the target folder
-		$baseName = pathinfo($fileName, PATHINFO_FILENAME);
-		$extension = pathinfo($fileName, PATHINFO_EXTENSION);
+		// Generate unique name to avoid conflicts inside the target folder
 		$uniqueName = $fileName;
-
-		// If file with this name already exists, append counter
-		$counter = 0;
-		while ($targetFolder->nodeExists($uniqueName)) {
-			$counter++;
-			$uniqueName = $baseName . ' (' . $counter . ')' . ($extension ? '.' . $extension : '');
+		
+		if ($isFolder) {
+			// For folders, check if folder with this name already exists
+			$counter = 0;
+			while ($targetFolder->nodeExists($uniqueName)) {
+				$counter++;
+				$uniqueName = $fileName . ' (' . $counter . ')';
+			}
+		} else {
+			// For files, use pathinfo to handle extensions
+			$baseName = pathinfo($fileName, PATHINFO_FILENAME);
+			$extension = pathinfo($fileName, PATHINFO_EXTENSION);
+			$counter = 0;
+			while ($targetFolder->nodeExists($uniqueName)) {
+				$counter++;
+				$uniqueName = $baseName . ' (' . $counter . ')' . ($extension ? '.' . $extension : '');
+			}
 		}
 
 		// Try to move with retry logic for locked files
@@ -448,7 +499,8 @@ class ArchiveJob extends TimedJob {
 		while ($attempt < $maxRetries) {
 			try {
 				$node->move($targetFolder->getPath() . '/' . $uniqueName);
-				$this->logger->debug('Archived file ' . $node->getId() . ' to ' . $targetFolder->getPath() . '/' . $uniqueName);
+				$nodeType = $isFolder ? 'folder' : 'file';
+				$this->logger->debug('Archived ' . $nodeType . ' ' . $node->getId() . ' to ' . $targetFolder->getPath() . '/' . $uniqueName);
 				return; // Success, exit the method
 			} catch (LockedException $e) {
 				$attempt++;
