@@ -10,11 +10,24 @@ import { translate as t } from '@nextcloud/l10n'
  * Add a visible Archive link to the Files app
  * This creates a prominent button/link that users can easily find
  */
+console.log('[Files Archive] filesArchiveLink.js script loaded')
+
 function addArchiveLink() {
+	console.log('[Files Archive] addArchiveLink() called')
 	// Only run in Files app
-	if (!window.location.pathname.startsWith('/apps/files')) {
+	// Check multiple URL patterns that Nextcloud uses for the Files app
+	const pathname = window.location.pathname
+	const isFilesPage = pathname.startsWith('/apps/files') || 
+	                    pathname.startsWith('/index.php/apps/files') ||
+	                    pathname.includes('/apps/files/') ||
+	                    (window.location.search && window.location.search.includes('app=files'))
+	
+	if (!isFilesPage) {
+		console.log('[Files Archive] Not on Files app page, skipping archive link. Pathname:', pathname)
 		return
 	}
+	
+	console.log('[Files Archive] Detected Files app page, adding archive link. Pathname:', pathname)
 
 	// Wait for Files app to load
 	const init = () => {
@@ -75,7 +88,9 @@ function addArchiveLink() {
 			}
 			
 			document.body.appendChild(floatingLink)
-			console.log('[Files Archive] Archive link added as floating button')
+			console.log('[Files Archive] ✅ Archive link added as floating button')
+		} else {
+			console.log('[Files Archive] Archive link already exists, skipping')
 		}
 	}
 
@@ -84,12 +99,25 @@ function addArchiveLink() {
 
 	// Also try after DOM is ready
 	if (document.readyState === 'loading') {
-		document.addEventListener('DOMContentLoaded', init)
+		document.addEventListener('DOMContentLoaded', () => {
+			console.log('[Files Archive] DOMContentLoaded fired')
+			init()
+		})
 	}
 
-	// Try again after a delay (Files app might load dynamically)
-	setTimeout(init, 1000)
-	setTimeout(init, 3000)
+	// Try again after delays (Files app might load dynamically)
+	setTimeout(() => {
+		console.log('[Files Archive] Retry after 1s')
+		init()
+	}, 1000)
+	setTimeout(() => {
+		console.log('[Files Archive] Retry after 3s')
+		init()
+	}, 3000)
+	setTimeout(() => {
+		console.log('[Files Archive] Retry after 5s')
+		init()
+	}, 5000)
 
 	// Listen for Files app navigation changes
 	const observer = new MutationObserver(() => {
