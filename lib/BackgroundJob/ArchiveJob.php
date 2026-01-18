@@ -23,6 +23,7 @@ use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
 use OCP\IDBConnection;
 use OCP\IUserManager;
+use OCP\Share\IManager as IShareManager;
 use OCP\SystemTag\ISystemTagManager;
 use OCP\SystemTag\ISystemTagObjectMapper;
 use OCP\SystemTag\TagNotFoundException;
@@ -38,6 +39,7 @@ class ArchiveJob extends TimedJob {
 		private readonly IRootFolder $rootFolder,
 		private readonly IJobList $jobList,
 		private readonly IUserManager $userManager,
+		private readonly IShareManager $shareManager,
 		private readonly LoggerInterface $logger,
 	) {
 		parent::__construct($timeFactory);
@@ -308,18 +310,29 @@ class ArchiveJob extends TimedJob {
 
 		if ($time < $archiveBefore) {
 			$this->logger->debug('Archiving file ' . $node->getId() . ' (age: ' . $time->format('Y-m-d') . ', threshold: ' . $archiveBefore->format('Y-m-d') . ')');
+			
+			// Check if file is shared - shared files may have locks from multiple users
+			$isShared = $this->isFileShared($node);
+			if ($isShared) {
+				$this->logger->debug('File ' . $node->getId() . ' is shared, using extended retry delays for locked files');
+			}
+			
 			try {
-				$this->moveToArchive($node);
+				// Use longer retry delays for shared files (5s, 10s, 20s vs 2s, 4s, 8s)
+				$retryDelay = $isShared ? 5 : 2;
+				$this->moveToArchive($node, 3, $retryDelay);
 				// Remove tag after archiving to prevent re-archiving (only for tag-based rules)
 				if ($tagId !== null) {
 					$this->removeTagFromFile($node->getId(), $tagId);
 				}
 				return true;
 			} catch (LockedException $e) {
-				// File is locked (being accessed/synced) - will retry in next run
-				$this->logger->warning('File ' . $node->getId() . ' is locked and could not be archived. Will retry in next archive run.', [
+				// File is locked (being accessed/synced/shared) - will retry in next run
+				$shareInfo = $isShared ? ' (shared file)' : '';
+				$this->logger->warning('File ' . $node->getId() . $shareInfo . ' is locked and could not be archived. Will retry in next archive run.', [
 					'exception' => $e,
 					'filePath' => $node->getPath(),
+					'isShared' => $isShared,
 				]);
 				return false;
 			} catch (Exception $e) {
@@ -537,6 +550,57 @@ class ArchiveJob extends TimedJob {
 				'exception' => $e,
 			]);
 			error_log('Time Archive: Failed to add archive folder to favorites: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Check if a file is shared with other users
+	 * Returns true if the file or any parent folder is shared
+	 */
+	private function isFileShared(Node $node): bool {
+		try {
+			$owner = $node->getOwner();
+			if ($owner === null) {
+				return false;
+			}
+			
+			$ownerId = $owner->getUID();
+			
+			// Check shares on the file itself
+			$shares = $this->shareManager->getSharesBy($ownerId, \OCP\Share\IShare::TYPE_USER, $node, false, -1, 0);
+			if (!empty($shares)) {
+				return true;
+			}
+			
+			$shares = $this->shareManager->getSharesBy($ownerId, \OCP\Share\IShare::TYPE_GROUP, $node, false, -1, 0);
+			if (!empty($shares)) {
+				return true;
+			}
+			
+			$shares = $this->shareManager->getSharesBy($ownerId, \OCP\Share\IShare::TYPE_LINK, $node, false, -1, 0);
+			if (!empty($shares)) {
+				return true;
+			}
+			
+			// Check if parent folder is shared (files inherit share status from parent)
+			$parent = $node->getParent();
+			if ($parent !== null && $parent instanceof Folder) {
+				$parentShares = $this->shareManager->getSharesBy($ownerId, \OCP\Share\IShare::TYPE_USER, $parent, false, -1, 0);
+				if (!empty($parentShares)) {
+					return true;
+				}
+				
+				$parentShares = $this->shareManager->getSharesBy($ownerId, \OCP\Share\IShare::TYPE_GROUP, $parent, false, -1, 0);
+				if (!empty($parentShares)) {
+					return true;
+				}
+			}
+			
+			return false;
+		} catch (Exception $e) {
+			// If we can't check shares, assume it's not shared to be safe
+			$this->logger->debug('Could not check if file ' . $node->getId() . ' is shared: ' . $e->getMessage());
+			return false;
 		}
 	}
 
