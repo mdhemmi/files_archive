@@ -131,6 +131,25 @@ npm run build
 npm run watch
 ```
 
+## Building and Releasing
+
+For detailed instructions on building the app and creating releases for the Nextcloud App Store, see:
+
+- **[BUILD_AND_RELEASE.md](BUILD_AND_RELEASE.md)** - Complete guide covering:
+  - Building the app (development and production)
+  - Creating release archives
+  - Signing the app
+  - Uploading to the Nextcloud App Store
+  - Automated releases with GitHub Actions
+  - Troubleshooting common issues
+
+Quick start for releases:
+1. Update version in `appinfo/info.xml`
+2. Build: `composer install --no-dev && npm ci && npm run build`
+3. Create archive: `tar -czf time_archive-VERSION.tar.gz time_archive/`
+4. Sign: `php occ app:sign time_archive --privateKey=... --certificate=... --path=/tmp`
+5. Upload to https://apps.nextcloud.com
+
 ## License
 
 AGPL-3.0-or-later
